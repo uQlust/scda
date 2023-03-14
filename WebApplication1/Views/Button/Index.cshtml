@@ -1,0 +1,25 @@
+﻿@model List<WebApplication1.Models.ButtonModel>
+
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>Index</title>
+</head>
+<body>
+    <div> 
+        <h1> Przyciski</h1>
+        @using (Html.BeginForm("ButtonClick","Button"))
+        {
+        <button type="submit" value="heatmap">
+            <img src="~/Images/panel5.bmp" > 
+        </button>
+        }
+    </div>
+</body>
+</html>

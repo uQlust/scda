@@ -1,0 +1,1700 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+//using Accord.Statistics.Distributions.Univariate;
+
+namespace phiClustCore
+{
+    public class Interval
+    {
+        public double min;
+        public double max;
+        public int code;
+
+    }
+    public class FileN
+    {
+        public string fileName;
+    }
+    public abstract class FilterOmics : ICloneable
+    {
+        public static List<OmicsDataSet> memoryFilteredData = new List<OmicsDataSet>();
+        protected string name = "";
+        protected bool parameters = false;
+        protected short cores = 5;
+
+        protected readonly object lockObj = new object();
+        public virtual string Name { get { return name; } }
+        public bool Parameters { get { return parameters; } }
+        public virtual Dictionary<string, Type> GetParameters() { return null; }
+        public virtual void SetParameters(Dictionary<string, string> x) { }
+        public virtual Dictionary<string, string> GetParametersValue() { return null; }
+        public abstract OmicsDataSet ApplyFilter(OmicsDataSet data);
+
+        public virtual void Clear()
+        {
+
+        }
+
+        public object Clone()
+        {
+            var clone = this.MemberwiseClone();
+            return clone;
+        }
+
+    }
+    public class QuantileColumn : FilterOmics
+    {
+        public QuantileColumn()
+        {
+            name = ToString();
+        }
+        public override string ToString()
+        {
+            return "Qunatile column normalization";
+        }
+        void QuantileThread(SpareArray rankData,SpareArray data,double []avr,int []count,int start, int end)
+        {            
+            for (int i = start; i < end; i++)
+            {                
+
+                var colTuple = data.GetColumnValues(i);
+                double[] columnValues = colTuple.Item1;
+                int []copyData = colTuple.Item2;
+
+                HashSet<double> diffValues = new HashSet<double>();
+                foreach (var item in columnValues)
+                    diffValues.Add(item);
+
+                var val = diffValues.ToArray();
+
+                int[] index = new int[diffValues.Count];
+                for (int j = 0; j < index.Length; j++)
+                    index[j] = j;
+
+                Array.Sort<int>(index, (a, b) => val[a].CompareTo(val[b]));
+                Array.Reverse(index);
+                //index.Reverse();
+                Dictionary<double, int> valToRank = new Dictionary<double, int>();
+
+                int k = 1;
+                foreach (var item in index)
+                    valToRank.Add(val[item], k++);
+
+                double[] rankToVal = new double[valToRank.Count];
+                foreach (var item in valToRank)
+                    rankToVal[item.Value - 1] = item.Key;
+
+                for (int j = 0; j < copyData.Length; j++)
+                    if (data[copyData[j], i] != 0)
+                        lock (lockObj)
+                        {
+                            rankData[copyData[j], i] = valToRank[data[copyData[j], i]];
+                        }
+
+                for (int j = 0; j < avr.Length; j++)
+                {
+                    if (j < rankToVal.Length)
+                    {
+                        lock (lockObj)
+                        {
+                            avr[j] += rankToVal[j];
+                            count[j]++;
+                        }
+                    }
+                }
+            }
+
+        }
+        public SpareArray QuantileTransform(SpareArray data)
+        {
+            int[] copyData;
+            SpareArray rankData;
+            Dictionary<double, int> dic = new Dictionary<double, int>();
+            double[] avr;
+
+            //data.Print();
+
+            avr = new double[data.rows];
+            rankData = new SpareArray(data.rows, data.columns, data.spareFlag);
+            int[] count = new int[data.rows];
+
+            Task[] t = new Task[cores];
+            float step = data.columns / ((float)cores);
+
+            for (int i = 0; i < cores; i++)
+            {
+                int s = (int)(step * i);
+                int e = (int)(step * (i + 1));
+                t[i] = Task.Run(() => QuantileThread(rankData,data,avr,count,s, e));
+            }
+            Task.WaitAll(t); 
+
+/*            for (int i = 0; i < data.columns; i++)
+            {
+                var colTuple = data.GetColumnValues(i);
+                double[] columnValues = colTuple.Item1;
+                copyData = colTuple.Item2;
+
+                HashSet<double> diffValues = new HashSet<double>();
+                foreach (var item in columnValues)
+                    diffValues.Add(item);
+
+                var val = diffValues.ToArray();
+
+                int[] index = new int[diffValues.Count];
+                for (int j = 0; j < index.Length; j++)
+                    index[j] = j;
+
+                Array.Sort<int>(index, (a, b) => val[a].CompareTo(val[b]));
+                Array.Reverse(index);
+                //index.Reverse();
+                Dictionary<double, int> valToRank = new Dictionary<double, int>();
+
+                int k = 1;
+                foreach (var item in index)
+                    valToRank.Add(val[item], k++);
+
+                double[] rankToVal = new double[valToRank.Count];
+                foreach (var item in valToRank)
+                    rankToVal[item.Value - 1] = item.Key;
+
+                for (int j = 0; j < copyData.Length; j++)
+                    if (data[copyData[j], i] != 0)
+                        rankData[copyData[j], i] = valToRank[data[copyData[j], i]];
+
+                for (int j = 0; j < avr.Length; j++)
+                {
+                    if (j < rankToVal.Length)
+                    {
+                        avr[j] += rankToVal[j];
+                        count[j]++;
+                    }
+                }
+
+
+            }*/
+            // rankData.Print();
+            for (int i = 0; i < avr.Length; i++)
+                if (count[i] > 0)
+                    avr[i] /= count[i];// data.columns;// count[i];
+
+
+
+            for (int i = 0; i < rankData.rows; i++)
+                for (int j = 0; j < rankData.columns; j++)
+                    if (rankData[i, j] != 0)
+                        rankData[i, j] = avr[(int)rankData[i, j] - 1];
+
+
+            //rankData.Print();
+
+            return rankData;
+        }
+
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            OmicsDataSet res = new OmicsDataSet(dataS.Name + "_" + ToString());
+
+            res.data = QuantileTransform(dataS.data);
+            res.geneLabels = dataS.geneLabels;
+            res.sampleLabels = dataS.sampleLabels;
+
+            memoryFilteredData.Add(res);
+
+            return res;
+        }
+
+    }
+    public class QuantileRow : QuantileColumn
+    {
+        public QuantileRow()
+        {
+            name = ToString();
+        }
+        public override string ToString()
+        {
+            return "Qunatile row normalization";
+        }
+
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            OmicsDataSet res = new OmicsDataSet(dataS.Name + "_" + ToString());
+            SpareArray tempData = dataS.data.Transpose();
+            SpareArray d = QuantileTransform(tempData);
+            res.data = d.Transpose();
+            res.geneLabels = dataS.geneLabels;
+            res.sampleLabels = dataS.sampleLabels;
+
+            memoryFilteredData.Add(res);
+            //res.Save("Quantile");
+            return res;
+        }
+
+    }
+    public class BulkFilter : FilterOmics
+    {
+        public BulkFilter()
+        {
+            name = ToString();
+        }
+        public override string ToString()
+        {
+            return "Bulk normalization";
+        }
+
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            OmicsDataSet res = new OmicsDataSet(dataS.Name + "_" + ToString());
+            double[] hist = new double[dataS.data.columns];
+            for (int i = 0; i < dataS.data.columns; i++)
+            {
+                double sum = 0;
+                for (int j = 0; j < dataS.data.rows; j++)
+                {
+                    sum += dataS.data[j, i];
+                }
+                hist[i] = sum / dataS.data.rows;
+            }
+            int[] index = new int[hist.Length];
+
+            res.data = new SpareArray(dataS.data.rows, dataS.data.columns, dataS.data.spareFlag);
+            for (int i = 0; i < index.Length; i++)
+                index[i] = i;
+
+            Array.Sort(hist, index);
+            Array.Reverse(index);
+            Array.Reverse(hist);
+
+            double[] tmp = new double[dataS.data.columns];
+            int[] tmpIndex = new int[tmp.Length];
+            for (int i = 0; i < dataS.data.rows; i++)
+            {
+                for (int j = 0; j < dataS.data.columns; j++)
+                    tmpIndex[j] = j;
+                for (int j = 0; j < dataS.data.columns; j++)
+                    tmp[j] = dataS.data[i, j];
+
+                Array.Sort(tmp, tmpIndex);
+                Array.Reverse(tmpIndex);
+                Array.Reverse(tmp);
+                for (int j = 0; j < dataS.data.columns; j++)
+                    if (tmp[j] > 0)
+                        res.data[i, tmpIndex[j]] = hist[j];
+
+            }
+
+            res.geneLabels = dataS.geneLabels;
+            res.sampleLabels = dataS.sampleLabels;
+
+            //memoryFilteredData.Add(res);
+
+            return res;
+        }
+
+    }
+
+    public class HallmarkGenes : FilterOmics
+    {
+        public HallmarkGenes()
+        {
+            name = ToString();
+        }
+        public override string ToString()
+        {
+            return "Hallmark Genes";
+        }
+        HashSet<string> LoadHallmarkGenes()
+        {
+            HashSet<string> geneNames = new HashSet<string>();
+            StreamReader st = new StreamReader(@"C:\projects\bioinfo\Cluster_patient\HALLMARK_test.txt");
+            string line = st.ReadLine();
+            while(line!=null)
+            {
+                if (!line.Contains(">"))
+                {
+                    string[] aux = line.Split(' ');
+                    foreach(var item in aux)
+                        geneNames.Add(item);
+                }
+                line = st.ReadLine();
+            }
+            st.Close();
+
+            return geneNames;
+        }
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            HashSet<string> validGenes = LoadHallmarkGenes();
+            OmicsDataSet res = new OmicsDataSet(dataS.Name + "_" + ToString());
+
+            res.data = new SpareArray(dataS.data.rows, validGenes.Count, dataS.data.spareFlag);
+
+            int[] index = new int[validGenes.Count];
+            res.geneLabels = new List<string>();
+            for(int i=0,k=0;i<dataS.geneLabels.Count;i++)
+            {
+                if(validGenes.Contains(dataS.geneLabels[i]))
+                {
+                    index[k++] = i;
+                    res.geneLabels.Add(dataS.geneLabels[i]);
+                }
+            }
+            for (int i = 0; i < dataS.data.rows; i++)
+                for (int j = 0; j < index.Length; j++)
+                    res.data[i, j] = dataS.data[i, index[j]];
+
+            res.sampleLabels = dataS.sampleLabels;
+
+            //memoryFilteredData.Add(res);
+
+            return res;
+        }
+
+    }
+
+
+    public class MinMaxAmountThreshold : FilterOmics
+    {
+        public double thresholdMin = 0;
+        public double thresholdMax = 0;
+
+        public MinMaxAmountThreshold()
+        {
+            name = ToString();
+            parameters = true;
+        }
+        public override Dictionary<string, Type> GetParameters()
+        {
+            Dictionary<string, Type> res = new Dictionary<string, Type>();
+            res.Add("Threshold Min", typeof(double));
+            res.Add("Threshold Max", typeof(double));
+            return res;
+        }
+        public override Dictionary<string, string> GetParametersValue()
+        {
+            Dictionary<string, string> v = new Dictionary<string, string>();
+            v.Add("Threshold Min", thresholdMin.ToString());
+            v.Add("Threshold Max", thresholdMax.ToString());
+
+            return v;
+        }
+
+        public override void SetParameters(Dictionary<string, string> x)
+        {
+            thresholdMin = Convert.ToDouble(x["Threshold Min"]);
+            thresholdMax = Convert.ToDouble(x["Threshold Max"]);
+            name = ToString() + " " + thresholdMin + " " + thresholdMax;
+        }
+        public override string ToString()
+        {
+            return "Min Max amount threshold";
+        }
+
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            OmicsDataSet res = new OmicsDataSet("MinMaxAmountThreshold");
+            HashSet<int> toRemove = new HashSet<int>();
+            /*            for (int i = 0; i < dataS.data.columns; i++)
+                        {
+                            int countW = 0;
+                            for (int j = 0; j < dataS.data.rows; j++)
+                            {
+                                if (dataS.data[j, i] > 0)
+                                    countW++;
+                            }
+                            if (countW < thresholdMin || countW>thresholdMax)
+                                toRemove.Add(i);
+                        }*/
+
+            //            SpareArray data = new SpareArray(dataS.data.rows, dataS.data.columns - toRemove.Count,false);
+
+            int[] freq = dataS.data.CountColumns();
+
+            res.data = dataS.data.FastCopyColumnThreshold(freq, (int)thresholdMin, (int)thresholdMax);
+            res.geneLabels = new List<string>();
+            for (int i = 0; i < freq.Length; i++)
+                if (freq[i] >= thresholdMin && freq[i] <= thresholdMax)
+                    res.geneLabels.Add(dataS.geneLabels[i]);
+
+
+            /*            for (int i = 0; i < dataS.data.rows; i++)
+                        {
+                            for (int j = 0, k = 0; j < dataS.data.columns; j++)
+                                if (!toRemove.Contains(j))
+                                    data[i, k++] = dataS.data[i, j];
+
+
+                        }
+
+
+                        res.data = data;
+                        res.geneLabels = new List<string>();
+                        for(int i=0;i<dataS.geneLabels.Count;i++)
+                        {
+                            if (!toRemove.Contains(i))
+                                res.geneLabels.Add(dataS.geneLabels[i]);
+                        }*/
+
+            res.sampleLabels = dataS.sampleLabels;
+
+
+            memoryFilteredData.Add(res);
+
+            return res;
+        }
+
+    }
+    public class MaxActivationThreshold : FilterOmics
+    {
+        float threshold = 0;
+
+        public MaxActivationThreshold()
+        {
+            name = ToString();
+            parameters = true;
+        }
+        public override Dictionary<string, Type> GetParameters()
+        {
+            Dictionary<string, Type> res = new Dictionary<string, Type>();
+            res.Add("Threshold", typeof(double));
+            return res;
+        }
+        public override void SetParameters(Dictionary<string, string> x)
+        {
+            threshold = Convert.ToSingle(x["Threshold"]);
+            name = ToString() + " " + threshold;
+        }
+        public override Dictionary<string, string> GetParametersValue()
+        {
+            Dictionary<string, string> v = new Dictionary<string, string>();
+            v.Add("Threshold", threshold.ToString());
+
+            return v;
+        }
+        public override string ToString()
+        {
+            return "Max value threshold";
+        }
+
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            OmicsDataSet res = new OmicsDataSet("MaxValueThreshold");
+            SpareArray data = dataS.data;
+            res.data = new SpareArray(data.rows, data.columns, false);
+
+            for (int j = 0; j < data.rows; j++)
+            {
+                for (int i = 0; i < data.columns; i++)
+                {
+                    res.data[j, i] = data[j, i];
+                    if (res.data[j, i] >= threshold)
+                    {
+                        res.data[j, i] = threshold;
+                    }
+                }
+            }
+
+
+
+            res.geneLabels = dataS.geneLabels;
+            res.sampleLabels = dataS.sampleLabels;
+            Interval[] intv = new Interval[2];
+
+            intv[0] = new Interval();
+            intv[0].code = 0;
+            intv[1] = new Interval();
+            intv[1].code = 1;
+            res.intervals.Add(intv);
+            memoryFilteredData.Add(res);
+
+            return res;
+        }
+
+    }
+    public class MinCountThresholdColumn : FilterOmics
+    {
+        float threshold = 0;
+
+        public MinCountThresholdColumn()
+        {
+            name = ToString();
+            parameters = true;
+        }
+        public override Dictionary<string, Type> GetParameters()
+        {
+            Dictionary<string, Type> res = new Dictionary<string, Type>();
+            res.Add("Threshold", typeof(double));
+            return res;
+        }
+        public override void SetParameters(Dictionary<string, string> x)
+        {
+            threshold = Convert.ToSingle(x["Threshold"]);
+            name = ToString() + " " + threshold;
+        }
+        public override Dictionary<string, string> GetParametersValue()
+        {
+            Dictionary<string, string> v = new Dictionary<string, string>();
+            v.Add("Threshold", threshold.ToString());
+
+            return v;
+        }
+        public override string ToString()
+        {
+            return "Min count threshold Column";
+        }
+        private int CountTh(int startR, int endR, SpareArray data, bool[] index)
+        {
+            int count = 0;
+            for (int j = startR; j < endR; j++)
+            {
+                double sum = 0;
+                for (int i = 0; i < data.rows; i++)
+                    if (data[i, j] > 0)
+                        sum++;
+
+                if (sum < threshold)
+                {
+                    count++;
+                }
+                else
+                {
+                    lock (lockObj)
+                    {
+                        index[j] = true;
+                    }
+                }
+            }
+            return count;
+        }
+        private void CopyData(int startR, int endR, SpareArray data, SpareArray outData, bool[] index, int[] co)
+        {
+            for (int j = startR; j < endR; j++)
+            {
+                if (index[j])
+                {
+                    int k;
+                    k = co[j];
+
+                    for (int i = 0; i < data.rows; i++)
+                        outData[i, k] = data[i, j];
+
+                }
+            }
+        }
+
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            OmicsDataSet res = new OmicsDataSet("MinCountThresholdColumn");
+            SpareArray data = dataS.data;
+
+            /*bool[] index = new bool[data.columns];
+            int[] co = new int[data.columns];
+            //res.geneLabels = new List<string>();
+            //int count = 0;
+            //for (int j = 0; j < data.columns; j++)
+            //{
+            //    double sum = 0;
+            //    for (int i = 0; i < data.rows; i++)
+            //        if (data[i, j] > 0)
+            //            sum++;
+
+            //    if (sum < threshold)
+            //    {
+            //        count++;
+            //    }
+            //    else
+            //    {
+            //        index[j] = true;
+            //        res.geneLabels.Add(dataS.geneLabels[j]);
+            //    }
+            //}
+
+            Task<int>[] t = new Task<int>[cores];
+
+            float step = data.columns / ((float)cores);
+
+            for (int i = 0; i < cores; i++)
+            {
+                int s = (int)(step * i);
+                int e = (int)(step * (i + 1));
+                t[i] = Task.Run(() => CountTh(s, e, data,index));
+            }
+            Task.WaitAll(t);
+            int count = 0;
+            for (int i = 0; i < cores; i++)
+                count += t[i].Result;
+
+            res.data = new SpareArray(data.rows, data.columns-count, data.spareFlag);
+            for (int i = 0,counter=0; i < index.Length; i++)
+                if (index[i])
+                    co[i] = counter++;
+
+            Task[] task = new Task[cores];
+            for (int i = 0; i < cores; i++)
+            {
+                int s = (int)(step * i);
+                int e = (int)(step * (i + 1));
+                task[i] = Task.Run(() => CopyData(s, e, data, res.data,index,co));
+            }
+            Task.WaitAll(task);
+
+
+                        //for (int j = 0; j < data.columns; j++)
+                        //{
+                        //    if (index[j])
+                        //    {
+                        //        for (int i = 0; i < data.rows; i++)
+                        //            res.data[i,count] = data[i,j];
+                        //        count++;
+                        //        res.geneLabels.Add(dataS.geneLabels[j]);
+                        //    }
+                        //}
+            
+            */
+            int[] freq = dataS.data.CountColumns();
+
+            res.data = dataS.data.FastCopyColumnThreshold(freq, (int)threshold, int.MaxValue);
+            res.geneLabels = new List<string>();
+            for (int i = 0; i < freq.Length; i++)
+                if (freq[i] >= threshold)
+                    res.geneLabels.Add(dataS.geneLabels[i]);
+            res.sampleLabels = dataS.sampleLabels;
+
+            Interval[] intv = new Interval[2];
+
+            intv[0] = new Interval();
+            intv[0].code = 0;
+            intv[1] = new Interval();
+            intv[1].code = 1;
+            res.intervals.Add(intv);
+
+            memoryFilteredData.Add(res);
+
+            return res;
+        }
+
+    }
+
+    public class MinCountThresholdRow : FilterOmics
+    {
+        float threshold = 0;
+
+        public MinCountThresholdRow()
+        {
+            name = ToString();
+            parameters = true;
+        }
+        public override Dictionary<string, Type> GetParameters()
+        {
+            Dictionary<string, Type> res = new Dictionary<string, Type>();
+            res.Add("Threshold", typeof(double));
+            return res;
+        }
+        public override void SetParameters(Dictionary<string, string> x)
+        {
+            threshold = Convert.ToSingle(x["Threshold"]);
+            name = ToString() + " " + threshold;
+        }
+        public override Dictionary<string, string> GetParametersValue()
+        {
+            Dictionary<string, string> v = new Dictionary<string, string>();
+            v.Add("Threshold", threshold.ToString());
+
+            return v;
+        }
+        public override string ToString()
+        {
+            return "Min count threshold Row";
+        }
+        private int CountTh(int startR, int endR, SpareArray data)
+        {
+            int count = 0;
+            for (int j = startR; j < endR; j++)
+            {
+                double sum = 0;
+                for (int i = 0; i < data.columns; i++)
+                    if (data[j, i] > 0)
+                        sum++;
+
+                if (sum < threshold)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            OmicsDataSet res = new OmicsDataSet("MinCountThresholdRow");
+            SpareArray data = dataS.data;
+
+            bool[] index = new bool[data.rows];
+
+            int count = 0;
+            for (int j = 0; j < data.rows; j++)
+            {
+                double sum = 0;
+                for (int i = 0; i < data.columns; i++)
+                    if (data[j, i] > 0)
+                        sum++;
+
+                if (sum < threshold)
+                {
+                    count++;
+                }
+                else
+                    index[j] = true;
+            }
+
+            /*  Task<int> []t = new Task<int>[5];
+
+              float step = data.rows / 5.0f;
+
+              for (int i = 0; i < 5; i++)
+              {
+                  int s = (int)(step * i);
+                  int e = (int)(step * (i + 1));
+                  t[i] = Task.Run(()=>CountTh(s,e,data));
+              }
+              Task.WaitAll(t);
+              int cc = 0;
+              for (int i = 0; i < 5; i++)
+                  cc += t[i].Result;
+            */
+
+            res.data = new SpareArray(data.rows - count, data.columns, data.spareFlag);
+            count = 0;
+            res.sampleLabels = new List<string>();
+
+            for (int j = 0; j < data.rows; j++)
+            {
+                if (index[j])
+                {
+                    for (int i = 0; i < data.columns; i++)
+                        res.data[count, i] = data[j, i];
+                    count++;
+                    res.sampleLabels.Add(dataS.sampleLabels[j]);
+                }
+            }
+
+
+            res.geneLabels = dataS.geneLabels;
+            // res.sampleLabels = dataS.sampleLabels;
+            Interval[] intv = new Interval[2];
+
+            intv[0] = new Interval();
+            intv[0].code = 0;
+            intv[1] = new Interval();
+            intv[1].code = 1;
+            res.intervals.Add(intv);
+
+            memoryFilteredData.Add(res);
+
+            return res;
+        }
+
+    }
+    public class LoadSuperGenes : FilterOmics
+    {
+        public FileN file = new FileN();
+        public override string Name { get { return ToString() + ":" + file.fileName; } }
+        public Dictionary<string, List<int>> superGenes = new Dictionary<string, List<int>>();
+
+        public LoadSuperGenes()
+        {
+            parameters = true;
+        }
+        public override Dictionary<string, Type> GetParameters()
+        {
+            Dictionary<string, Type> res = new Dictionary<string, Type>();
+            res.Add("File name", typeof(string));
+            return res;
+        }
+        public override void SetParameters(Dictionary<string, string> x)
+        {
+            file.fileName = x["File name"];
+            name = ToString() + " " + file.fileName;
+        }
+        public override Dictionary<string, string> GetParametersValue()
+        {
+            Dictionary<string, string> v = new Dictionary<string, string>();
+            v.Add("File name", file.fileName);
+
+            return v;
+        }
+        public override string ToString()
+        {
+            return "Super gene file";
+        }
+        Dictionary<string, List<int>> ReadSuperGenes(string fileName, List<string> genes)
+        {
+            StreamReader sr = new StreamReader(fileName);
+
+            Dictionary<string, int> hashGeneNames = new Dictionary<string, int>();
+
+            for (int i = 0; i < genes.Count; i++)
+                hashGeneNames.Add(genes[i], i);
+
+            Dictionary<int, int> check = new Dictionary<int, int>();
+
+            string superGeneName = "";
+            string line = sr.ReadLine();
+            while (line != null)
+            {
+                if (line.StartsWith(">"))
+                    superGeneName = line.Substring(1);
+                else
+                {
+                    string[] aux = line.Split(' ');
+                    List<string> l = aux.ToList();
+                    List<int> genesPositions = new List<int>();
+                    foreach (var item in l)
+                        if (hashGeneNames.ContainsKey(item))
+                            genesPositions.Add(hashGeneNames[item]);
+                    /* else
+                         throw new Exception("Uknown gene: " + item);*/
+                    superGenes.Add(superGeneName, genesPositions);
+                }
+
+                line = sr.ReadLine();
+            }
+            sr.Close();
+
+            return superGenes;
+        }
+
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            StreamWriter st = new StreamWriter("SuperIndex");
+            foreach (var item in superGenes)
+            {
+                st.Write(item.Key + ": ");
+                for (int i = 0; i < item.Value.Count; i++)
+                    st.Write(item.Value[i] + " ");
+                st.WriteLine();
+            }
+            st.Close();
+            var res = dataS.CreateSuperGenesData(superGenes);
+
+            Interval[] intv = new Interval[2];
+
+            intv[0] = new Interval();
+            intv[0].code = 0;
+            intv[1] = new Interval();
+            intv[1].code = 1;
+            res.intervals.Add(intv);
+
+            memoryFilteredData.Add(res);
+
+            //res.Save("SuperGenes");
+
+            return res;
+        }
+
+    }
+
+    public class ShiftDataToNonNegative : FilterOmics
+    {
+
+        public ShiftDataToNonNegative()
+        {
+            name = ToString();
+        }
+        public override string ToString()
+        {
+            return "Shift data to non negative values";
+        }
+
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            OmicsDataSet res = new OmicsDataSet("ShiftNonNegative");
+            SpareArray data = dataS.data;
+            res.data = new SpareArray(data.rows, data.columns, false);
+            double minValue = double.MaxValue;
+            for (int j = 0; j < data.rows; j++)
+            {
+
+                for (int i = 0; i < data.columns; i++)
+                    if (data[j, i] <= minValue)
+                        minValue = data[j, i];
+            }
+
+
+            if (minValue < 0)
+            {
+                for (int j = 0; j < data.rows; j++)
+                {
+                    for (int i = 0; i < data.columns; i++)
+                        res.data[j, i] = (float)(data[j, i] + Math.Abs(minValue));
+                }
+
+
+            }
+            else
+                res.data = data;
+
+
+            res.geneLabels = dataS.geneLabels;
+            res.sampleLabels = dataS.sampleLabels;
+
+            memoryFilteredData.Add(res);
+
+            return res;
+        }
+
+    }
+
+    public class Descritize : FilterOmics
+    {
+        CodingAlg coding;
+        [Description("Number of descret states")]
+        public int NumStates { get; set; }
+        [Description("Coding algorithm")]
+        public CodingAlg Coding { get { return coding; } set { coding = value; } }
+
+        List<Interval[]> intervals = new List<Interval[]>();
+
+
+        public Descritize()
+        {
+            name = ToString();
+            parameters = true;
+        }
+
+        public override void Clear()
+        {
+            intervals.Clear();
+        }
+
+        public override Dictionary<string, Type> GetParameters()
+        {
+            Dictionary<string, Type> res = new Dictionary<string, Type>();
+
+            res.Add("Number of states", typeof(int));
+
+            res.Add("Coding algorithm", typeof(CodingAlg));
+            return res;
+        }
+        public override void SetParameters(Dictionary<string, string> x)
+        {
+            NumStates = Convert.ToInt32(x["Number of states"]);
+            Enum.TryParse<CodingAlg>(x["Coding algorithm"], out coding);
+            name = "Descritize " + NumStates + " " + Coding;
+        }
+        public override Dictionary<string, string> GetParametersValue()
+        {
+            Dictionary<string, string> v = new Dictionary<string, string>();
+            v.Add("Number of states", NumStates.ToString());
+            v.Add("Coding algorithm", coding.ToString());
+
+            return v;
+        }
+
+        public override string ToString()
+        {
+            return "Descritize ";
+        }
+        Tuple<double, double> BinomialFit(double[] dat)
+        {
+            int[] frequency = new int[1000];
+            int[] v = new int[dat.Length];
+            for (int i = 0; i < dat.Length; i++)
+            {
+                v[i] = (int)(dat[i] * 1000);
+                frequency[v[i]]++;
+            }
+
+
+            double mean;
+            double sumF = 0;
+            double sumFx = 0;
+            int n = 0;
+            for (int i = 0; i < frequency.Length; i++)
+            {
+                if (frequency[i] > 0)
+                {
+                    sumF += frequency[i];
+                    sumFx = frequency[i] * i;
+                    n++;
+                }
+            }
+            mean = sumFx / sumF;
+            double p = mean / n;
+            double variance = mean * (1 - p);
+
+            return new Tuple<double, double>(mean, variance);
+        }
+
+        public static Tuple<double, double, double[], double[]> NegativeBinomialFit(double[] dat, bool realValue, double maxV)
+        {
+            int[] frequency = new int[10001];
+            int[] v = new int[dat.Length];
+
+            double max = int.MinValue;
+            for (int i = 0; i < dat.Length; i++)
+            {
+                v[i] = (int)(dat[i] * 10000);
+
+            }
+
+            //frequency = new int[max+1];
+
+            for (int i = 0; i < dat.Length; i++)
+            {
+                frequency[v[i]]++;
+            }
+            int[] newFreq = new int[50];
+            double[] realValues = new double[50];
+            int step = 0;
+            double s = frequency.Length / 49.0;
+            for (double i = 0; i < frequency.Length; i += s, step++)
+            {
+                int sum = 0;
+                double realV = 0;
+                int count = 0;
+                for (int j = (int)i; j < s * step + s; j++)
+                {
+                    sum += frequency[j];
+                    realV += (j * maxV) / 10000;
+                    count++;
+                }
+                newFreq[step] = sum;
+                realValues[step] = realV / count;
+            }
+            frequency = newFreq;
+
+            double mean;
+            double sumF = 0;
+            double sumFx = 0;
+            double sumFx2 = 0;
+            int n = 0;
+            for (int i = 0; i < frequency.Length; i++)
+            {
+                if (frequency[i] > 0)
+                {
+
+                    double val;
+                    if (realValue)
+                        val = (i * maxV) / 10000.0;
+                    else
+                        val = i;
+                    sumF += frequency[i];
+                    sumFx += frequency[i] * i;
+                    sumFx2 += frequency[i] * i * i;
+                    n++;
+                }
+            }
+            mean = sumFx / sumF;
+
+            double deviation = sumFx2 / sumF - mean * mean;
+            double p = mean / deviation;
+            double q = 1 - p;
+            double k = mean * p / q;
+            double[] retriveFrequency = new double[frequency.Length];
+            double px = Math.Pow(p, k);
+            retriveFrequency[0] = px * sumF;
+            for (int i = 1; i < frequency.Length; i++)
+            {
+                px = (i + k - 1) / (i) * q * px;
+                retriveFrequency[i] = px * sumF;
+            }
+            double xx = realValues[(int)Math.Ceiling(mean)];
+            double yy = realValues[(int)Math.Ceiling(Math.Sqrt(deviation))];
+            return new Tuple<double, double, double[], double[]>(xx, yy, retriveFrequency, realValues);
+        }
+        public static Interval[] GetIntervals(double avr, double stdev, int NumStates)
+        {
+            Interval[] intervals = new Interval[NumStates];
+            for (int n = 0; n < NumStates; n++)
+                intervals[n] = new Interval();
+
+            int s = 0;
+            double st;
+            if (NumStates == 3)
+                st = stdev / (NumStates - 2);
+            else
+                st = stdev * 2 / (NumStates - 2);
+            //st /= 2;
+
+
+
+            intervals[s].min = double.MinValue;
+            intervals[s++].max = avr - st * (NumStates - 3) - st;
+            for (int k = 0; k < NumStates - 2; k++, s++)
+            {
+                intervals[s].min = intervals[s - 1].max;
+                intervals[s].max = intervals[s].min + 2 * st;
+            }
+            intervals[s].min = intervals[s - 1].max;
+            intervals[s].max = double.MaxValue;
+
+
+            return intervals;
+        }
+        SpareArray ZScoreCoding(SpareArray data, OmicsDataSet om)
+        {
+
+            SpareArray newData = new SpareArray(data.rows, data.columns, false);
+            double[] col = new double[newData.rows];
+            for (int i = 0; i < data.columns; i++)
+            {
+
+                double maxV = double.MinValue;
+                for (int n = 0; n < data.rows; n++)
+                {
+                    col[n] = data[n, i];
+                    if (col[n] < 0)
+                        Console.WriteLine("UUU");
+                    if (maxV < col[n])
+                        maxV = col[n];
+                }
+                //NormalDistribution b = new NormalDistribution();
+                //BinomialDistribution b = new BinomialDistribution();  
+
+                // NegativeBinomialDistribution b = new NegativeBinomialDistribution(1;
+
+                double avr;
+                double stdev;
+
+                //var h=BinomialFit(col);
+                //Zróbmy normalizację col
+                for (int n = 0; n < col.Length; n++)
+                    col[n] /= maxV;
+
+                var h = NegativeBinomialFit(col, true, maxV);
+
+                for (int n = 0; n < col.Length; n++)
+                    col[n] *= maxV;
+
+                avr = h.Item1;
+                stdev = h.Item2;
+
+                var intv = GetIntervals(avr, stdev, NumStates);
+
+                intervals.Add(intv);
+
+                AssignCodeToIntervals(avr, intv);
+                om.AddCodes(intv);
+                for (int n = 0; n < col.Length; n++)
+                    for (int k = 0; k < intv.Length; k++)
+                        if (col[n] > intv[k].min && col[n] <= intv[k].max)
+                        {
+                            newData[n, i] = intv[k].code;
+                            break;
+                        }
+            }
+
+            return newData;
+        }
+        void ApplyFilterThread(int s,int e)
+        {
+
+        }
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            OmicsDataSet res = new OmicsDataSet(dataS.Name + "_" + ToString());
+            Dictionary<double, int> hashValues = new Dictionary<double, int>();
+            SpareArray outData = null;
+            SpareArray data = dataS.data;
+            double max = Double.MinValue;
+            Interval[] intv = null;
+            if (Coding == CodingAlg.Z_SCORE)
+                outData = ZScoreCoding(data, res);
+            else
+            {
+                outData = new SpareArray(data.rows, data.columns, false);
+                for (int i = 0; i < data.columns; i++)
+                {
+                    hashValues.Clear();
+                    for (int j = 0; j < data.rows; j++)
+                    {
+
+                        if (!hashValues.Keys.Contains(data[j, i]))
+                            hashValues.Add(data[j, i], 1);
+                        else
+                            hashValues[data[j, i]]++;
+                    }
+                    intv = SetupIntervals(hashValues, NumStates, Coding);
+                    var codedRow = IntervalCodigPerSample(data, i, intv);
+                    for (int k = 0; k < codedRow.Length; k++)
+                        outData[k, i] = codedRow[k];
+                    intervals.Add(intv);
+
+                }
+
+            }
+            res.data = outData;
+            res.geneLabels = dataS.geneLabels;
+            res.sampleLabels = dataS.sampleLabels;
+
+            res.intervals = intervals;
+            res.AddCodes(intervals[0]);
+
+
+            memoryFilteredData.Add(res);
+            //res.Save("Discr");
+            return res;
+        }
+        public static void AssignCodeToIntervals(double avr, Interval[] intervals)
+        {
+            if (intervals.Length == 3)
+            {
+                intervals[0].code = -1;
+                intervals[1].code = 0;
+                intervals[2].code = 1;
+            }
+            else
+                for (int i = 0; i < intervals.Length; i++)
+                    intervals[i].code = i;
+
+
+        }
+        Interval[] SetupIntervals(Dictionary<double, int> dataValues, int numStates, CodingAlg coding)
+        {
+            if (numStates < 3)
+                numStates = 3;
+            Interval[] intervals = null;
+            double max, min;
+            max = double.MinValue;
+            min = double.MaxValue;
+            int n = 0;
+            double step = 0;
+            int i = 0;
+            List<double> dlist = new List<double>(dataValues.Keys);
+            dlist.Sort();
+            min = dlist[0];
+            max = dlist[dlist.Count - 1];
+
+
+            switch (coding)
+            {
+                case CodingAlg.EQUAL_DIST:
+                    intervals = new Interval[numStates];
+                    step = (max - min) / numStates;
+                    for (i = 0; i < numStates; i++)
+                    {
+                        intervals[i] = new Interval();
+                        intervals[i].min = dlist[0] + i * step;
+                        intervals[i].max = dlist[0] + (i + 1) * step;
+                    }
+                    intervals[0].min = double.MinValue;
+                    intervals[intervals.Length - 1].max = double.MaxValue;
+                    break;
+
+                case CodingAlg.PERCENTILE:
+                    int counter = 0;
+                    double end = 0;
+
+                    foreach (var item in dataValues.Values)
+                        counter += item;
+                    int amount = numStates * counter / 100;
+                    counter = 0;
+                    int k = 0;
+                    intervals = new Interval[3];
+                    for (int s = 0; s < intervals.Length; s++)
+                        intervals[s] = new Interval();
+                    double begin = dlist[0];
+                    for(int s=0;s<dlist.Count;s++)
+                    {
+                        counter += dataValues[dlist[s]];
+                        if (counter >= amount)
+                        {
+                            int c = s + 1;
+                            if (c < dlist.Count)
+                                intervals[0].max = dlist[s] + 0.01 * (dlist[c] - dlist[s]);
+                            else
+                                intervals[0].max = dlist[s];
+                            intervals[0].min = double.MinValue;
+                            break;
+                        }
+                    }
+                    counter = 0;
+                    for (int s = dlist.Count - 1; s > 0; s--)
+                    {
+                        counter += dataValues[dlist[s]];
+                        if (counter > amount)
+                        {
+                            intervals[1].min = intervals[0].max;
+                            intervals[1].max = dlist[s] + 0.01 * dlist[s];
+
+                            intervals[2].min = intervals[1].max;
+                            intervals[2].max = double.MaxValue;
+                            break;
+                        }
+                    }
+
+                    break;
+
+
+            }
+
+            AssignCodeToIntervals(0, intervals);
+
+            return intervals;
+
+        }
+        int[] IntervalCodigPerSample(SpareArray data, int num, Interval[] intv)
+        {
+            int[] codedData = new int[data.rows];
+            for (int j = 0; j < data.rows; j++)
+            {
+                for (int k = 0; k < intv.GetLength(0); k++)
+                {
+                    if (data[j, num] >= intv[k].min && data[j, num] < intv[k].max)
+                    {
+                        codedData[j] = intv[k].code;
+                        break;
+                    }
+                }
+
+
+            }
+
+            return codedData;
+        }
+    }
+    public class GlobalZScore : FilterOmics
+    {
+        double[] dev;
+        public double[] columns;
+
+        public GlobalZScore()
+        {
+            name = ToString();
+        }
+
+        public override string ToString()
+        {
+            return "Global Z-score";
+        }
+
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            double sumAll = 0;
+            OmicsDataSet res = new OmicsDataSet(dataS.Name + "_" + ToString());
+            SpareArray data = (SpareArray)this.Clone();
+
+            columns = new double[data.columns];
+
+            int rem = 0;
+            for (int i = 0; i < dataS.geneLabels.Count; i++)
+                if (dataS.geneLabels[i].Contains("ACAP3"))
+                {
+                    rem = i;
+                    break;
+                }
+
+            double[] acap = new double[dataS.data.rows];
+            for (int i = 0; i < acap.Length; i++)
+                acap[i] = dataS.data[i, rem];
+
+
+            for (int i = 0; i < data.rows; i++)
+                for (int j = 0; j < data.columns; j++)
+                    sumAll += data[i, j];
+
+            for (int i = 0; i < data.columns; i++)
+                for (int j = 0; j < data.rows; j++)
+                {
+                    data[j, i] /= sumAll;
+                    columns[i] += data[j, i];
+                }
+            int[] index = new int[columns.Length];
+
+            for (int i = 0; i < index.Length; i++)
+            {
+                index[i] = i;
+                columns[i] /= data.rows;
+            }
+
+
+            /* double []locColumns =(double []) columns.Clone();
+             Array.Sort(locColumns, index);
+
+             StreamWriter cc = new StreamWriter("ccc");
+             for (int i = 0; i < dataS.geneLabels.Count; i++)
+                 cc.WriteLine(dataS.geneLabels[index[i]] + " " + locColumns[i]);
+             cc.Close();*/
+
+            //for (int i = 0; i < columns.Length; i++)
+            //    columns[i] /= sumAll;
+            res.geneLabels = dataS.geneLabels;
+            res.sampleLabels = dataS.sampleLabels;
+            res.data = data;
+
+            memoryFilteredData.Add(res);
+            return res;
+        }
+    }
+    public class ZScoreColumn : FilterOmics
+    {
+        double[] dev;
+        double[] avr;
+
+        public ZScoreColumn()
+        {
+            name = ToString();
+        }
+
+        public override string ToString()
+        {
+            return "Z-score column";
+        }
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            OmicsDataSet res = new OmicsDataSet(dataS.Name + "_" + ToString());
+            SpareArray data = (SpareArray)dataS.data.Clone();
+
+            double[] xx = new double[data.rows];
+            double[] weight = new double[xx.Length];
+            dev = new double[data.columns];
+            avr = new double[data.columns];
+
+            for (int i = 0; i < data.columns; i++)
+            {
+                for (int j = 0; j < data.rows; j++)
+                    xx[j] = data[j, i];
+
+                var h = Descritize.NegativeBinomialFit(xx, true, 1);
+                //BinomialDistribution b = new BinomialDistribution();
+                //b.Fit(xx);
+                //b.Fit(xx, weight);
+                dev[i] = h.Item2;
+                avr[i] = h.Item1;
+                //b.Variance
+            }
+
+
+
+            /*            for (int i = 0; i < data.GetLength(1); i++)
+                        {
+                            sumX = 0;
+                            sumX2 = 0;
+                            int counter = 0;
+                            for (int j = 0; j < data.GetLength(0); j++)
+                                if (data[j, i] != double.NaN)
+                                {
+                                    sumX += data[j, i];
+                                    sumX2 += data[j, i] * data[j, i];
+                                    counter++;
+                                }
+
+                            if (counter > 0)
+                            {
+                                sumX /= counter;
+                                sumX2 /= counter;
+                                avr[i] = sumX;
+                                dev[i] = Math.Sqrt(sumX2 - avr[i] * avr[i]);
+                            }
+                        }*/
+
+
+            for (int i = 0; i < data.columns; i++)
+            {
+
+                for (int j = 0; j < data.rows; j++)
+                    if (data[j, i] != double.NaN && data[j, i] != 0 && dev[i] > 0)
+                        data[j, i] = (float)((data[j, i] - avr[i]) / dev[i]);
+            }
+
+            /*double []dev2 = new double[data.GetLength(1)];
+            for (int i = 0; i < data.GetLength(1); i++)
+            {
+                for (int j = 0; j < data.GetLength(0); j++)
+                    xx[j] = data[j, i];
+
+                NormalDistribution b = new NormalDistribution();
+                b.Fit(xx);
+                //b.Fit(xx, weight);
+                
+                dev2[i] = b.StandardDeviation;
+                avr[i] = b.Mean;
+                //b.Variance
+            }*/
+
+            res.data = data;
+            res.geneLabels = dataS.geneLabels;
+            res.sampleLabels = dataS.sampleLabels;
+
+            memoryFilteredData.Add(res);
+            return res;
+        }
+
+    }
+
+    public class ZScoreRow : FilterOmics
+    {
+
+        double[] dev;
+        double[] avr;
+
+        public ZScoreRow()
+        {
+            name = ToString();
+        }
+        public override string ToString()
+        {
+            return "Z-score row";
+        }
+
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            double sumX = 0;
+            double sumX2 = 0;
+            OmicsDataSet res = new OmicsDataSet(dataS.Name + "_" + ToString());
+            SpareArray data = (SpareArray)dataS.data.Clone();
+            dev = new double[data.rows];
+            avr = new double[data.rows];
+
+            for (int i = 0; i < data.rows; i++)
+            {
+                sumX = 0;
+                sumX2 = 0;
+                int counter = 0;
+                for (int j = 0; j < data.columns; j++)
+                    if (data[i, j] != double.NaN)
+                    {
+                        sumX += data[i, j];
+                        sumX2 += data[i, j] * data[i, j];
+                        counter++;
+                    }
+
+                if (counter > 0)
+                {
+                    sumX /= counter;
+                    sumX2 /= counter;
+                    avr[i] = sumX;
+                    dev[i] = (float)Math.Sqrt(sumX2 - avr[i] * avr[i]);
+                }
+            }
+
+
+            for (int i = 0; i < data.rows; i++)
+            {
+
+                for (int j = 0; j < data.columns; j++)
+                    if (data[i, j] != double.NaN && data[i, j] != 0 && dev[i] > 0)
+                        data[i, j] = (data[i, j] - avr[i]) / dev[i];
+            }
+            res.data = data;
+            res.geneLabels = dataS.geneLabels;
+            res.sampleLabels = dataS.sampleLabels;
+
+            memoryFilteredData.Add(res);
+
+            return res;
+        }
+
+    }
+    public class RowNormalizationLog : FilterOmics
+    {
+
+        public RowNormalizationLog()
+        {
+            name = ToString();
+        }
+        public override string ToString()
+        {
+            return "Row normalization log";
+        }
+
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            OmicsDataSet res = new OmicsDataSet(dataS.Name + "_" + ToString());
+
+            SpareArray data = new SpareArray(dataS.data.rows, dataS.data.columns, dataS.data.spareFlag);
+            res.data = dataS.data.NormalizeRowsLog();
+            res.geneLabels = dataS.geneLabels;
+            res.sampleLabels = dataS.sampleLabels;
+
+            //            memoryFilteredData.Add(res);
+            //res.Save("NormalizationLog");
+            return res;
+        }
+
+    }
+
+    public class RowNormalization : FilterOmics
+    {
+
+
+        public RowNormalization()
+        {
+            name = ToString();
+        }
+        public override string ToString()
+        {
+            return "Row normalization";
+        }
+        void NormalizeRow(int start, int end, SpareArray inData, SpareArray outData)
+        {
+            for (int i = start; i < end; i++)
+            {
+                //double max =Double.MinValue ;
+                double sum = 0;
+                for (int j = 0; j < inData.columns; j++)
+                    sum += inData[i, j];
+
+                for (int j = 0; j < inData.columns; j++)
+                    if (inData[i, j] != 0)
+                        lock (lockObj)
+                            outData[i, j] = inData[i, j] / sum;
+
+            }
+
+        }
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            OmicsDataSet res = new OmicsDataSet(dataS.Name + "_" + ToString());
+
+            /*SpareArray data; = new SpareArray(dataS.data.rows, dataS.data.columns, dataS.data.spareFlag);
+
+            Task[] t = new Task[cores];
+            float step = data.rows / ((float)cores);
+
+            for (int i = 0; i < cores; i++)
+            {
+                int s = (int)(step * i);
+                int e = (int)(step * (i + 1));
+                t[i] = Task.Run(() => NormalizeRow(s, e,dataS.data,data));
+            }
+            Task.WaitAll(t);*/
+
+
+
+
+
+            /*            for (int i = 0; i < dataS.data.rows; i++)
+                        {
+                            //double max =Double.MinValue ;
+                            double sum = 0;
+                            for (int j = 0; j < dataS.data.columns; j++)
+                                sum += dataS.data[i, j];
+
+                            for (int j = 0; j < dataS.data.columns; j++)
+                                if(dataS.data[i,j]!=0)
+                                    data[i, j] = dataS.data[i,j]/sum;
+
+                        }*/
+
+            //res.data = data;
+
+            res.data = dataS.data.NormalizeRows();
+            res.geneLabels = dataS.geneLabels;
+            res.sampleLabels = dataS.sampleLabels;
+
+            memoryFilteredData.Add(res);
+
+
+            //res.Save("Normalization");
+
+            return res;
+        }
+
+    }
+}

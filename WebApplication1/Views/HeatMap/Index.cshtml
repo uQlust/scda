@@ -1,0 +1,74 @@
+﻿@using phiClustCore
+@using System.ComponentModel.DataAnnotations;
+@model WebApplication1.Models.HeatMapModel
+
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>Index</title>
+</head>
+<body>
+    <link type="text/css" rel="stylesheet" href="~/Content/heatmap.css" />
+    @using (Html.BeginForm("SubmitModel", "HeatMap"))
+    {
+        @Html.AntiForgeryToken()
+
+        <div class="form-horizontal">
+            <h4>HeatMapModel</h4>
+            <hr />
+            @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+
+            <div class="editor">
+                <p>
+                    @Html.LabelFor(model => model.reqColumnClusters)
+                    @Html.EditorFor(model => model.reqColumnClusters)
+                </p>
+                <p>
+                    @Html.LabelFor(model => model.reqRowClusters)
+                    @Html.EditorFor(model => model.reqRowClusters)
+                </p>
+                <p>
+                    @Html.LabelFor(model => model.dist)
+                    @Html.EnumDropDownListFor(model => model.dist)
+                </p>
+                <p>
+                    @Html.LabelFor(model => model.cluster)
+                    @{
+                        var lista = Enum.GetValues(typeof(ClusterAlgorithm));
+                        List<SelectListItem> xx = new List<SelectListItem>();
+
+                        foreach (var item in lista)
+                        {
+                            var type = item.GetType();
+                            var res = type.GetField(item.ToString()).GetCustomAttributes(true);
+                            if (res.Length > 0)
+                            {
+                                xx.Add(new SelectListItem { Text = ((DisplayAttribute)res[0]).Name, Value = ((int)item).ToString() });
+                            }
+
+                        }
+
+                    }
+                    @Html.DropDownListFor(m => m.cluster, xx)
+                </p>
+            </div>
+
+
+            <div class="col-md-offset-2 col-md-10">
+                <input type="submit" value="Create" class="btn btn-default" />
+            </div>
+
+        </div>
+    }
+
+    <div>
+        @Html.ActionLink("Back to List", "Index")
+    </div>
+</body>
+</html>
