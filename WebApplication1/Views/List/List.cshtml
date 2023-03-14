@@ -1,0 +1,183 @@
+﻿
+@model WebApplication1.Models.ListModel
+
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>View</title>
+</head>
+<body>
+
+    <link type="text/css" rel="stylesheet" href="~/Content/list.css" />
+    <h2>
+        Upload omics files
+    </h2>
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script>
+            function setupFilter(sel)
+            {
+                $.post('@Url.Action("SetupSelection","List")', { m: sel }).done(function (data, textStatus, jqXHR) {
+                    var txt = '/Filter/Index';
+                    if (jqXHR.responseText.length>0)
+                        window.location.href = txt;
+                });
+
+            }
+            function removeFilter(val) {
+                var ss = $.post('@Url.Action("RemoveSelection","List")', { m: val })
+                window.location.reload();
+        }
+            function ClearFiles() {
+                var ss = $.post('@Url.Action("ClearFiles","List")')
+                window.location.reload();
+            }
+            function ClearSuperGenes() {
+                var ss = $.post('@Url.Action("ClearSuperGenes","List")')
+                window.location.reload();
+            }
+        function Heatmap() {
+            var txt = '/HeatMap/Index'
+            window.location.href = txt;
+        }
+            function addFilter(val) {
+                $.post('@Url.Action("AddSelection","List")', { m: val }).done(function (data, textStatus, jqXHR) {
+                    var txt = '/Filter/Index';
+                    if (jqXHR.responseText.length > 0) {
+
+
+                        window.location.href = txt;
+                        
+                    }
+
+                });
+                window.location.reload();
+                return;
+                }
+    </script>
+
+    @using (Html.BeginForm("UploadFile", "List", FormMethod.Post, new { enctype = "multipart/form-data" }))
+    {
+        <div>
+
+            @Html.TextBox("file", "", new { type = "file" })
+            <input type="submit" value="Upload" />
+            <br> <br>
+            @ViewBag.Message
+            <br /><br />
+
+
+        </div>
+    }
+    <div>
+        @if (Model.fileNames != null && Model.fileNames.Count > 0)
+        {
+            <h2>
+                Selected Files
+            </h2>
+            <ul id="Files">
+                @foreach (var item in Model.fileNames)
+                {
+
+                    <li>@Html.DisplayFor(m => item)</li>
+                }
+
+            </ul>
+            <button onclick="ClearFiles()">Clear Files</button>
+            <br />
+            <br />
+        }
+
+
+
+    </div>
+
+    <h2>
+        Upload super genes
+    </h2>
+    @using (Html.BeginForm("UploadSuperGenes", "List", FormMethod.Post, new { enctype = "multipart/form-data" }))
+    {
+        <div>
+
+            @Html.TextBox("file", "", new { type = "file" })
+            <input type="submit" value="Upload" />
+            <br> <br>
+            @ViewBag.Message
+
+        </div>
+    }
+    <br /><br />
+    <div>
+        @if (Model.superGenesFile != null && Model.superGenesFile.Length > 0)
+        {
+            <h2>
+                Selected super gene file
+            </h2>
+            <ul id="SuperGene">
+                <li>@Model.superGenesFile</li>
+            </ul>
+            <button onclick="ClearSuperGenes()">Remove super genes file</button>
+            <br />
+            <br />
+        }
+
+
+
+    </div>
+
+    <h2>
+        Select Filters
+    </h2>
+    </div>
+
+    <table>
+        <tr>
+            <th>
+                Available filters
+            </th>
+            <th>
+                Selected filters
+            </th>
+
+        </tr>
+        <tr>
+            <th>
+                <div class="custom-select">
+                    <ul style="list-style-type:none" class="custom-select">
+                        @foreach (var item in WebApplication1.Models.ListModel.avFilters)
+                        {
+                            <li class="custom-select" onmousedown="addFilter('@item')">@item </li>
+
+                        }
+                    </ul>
+                </div>
+            </th>
+            <th>
+                <div class="selected">
+                    <ul class="selected" id="Filters" style="list-style-type:none">
+                        @foreach (var item in Model.selectedFilters)
+                        {
+                            <li class="selected" id='@item' onmousedown="setupFilter('@item')">@item </li>
+                        }
+                    </ul>
+                </div>
+            </th>
+            <th>
+                <ul class="Button" id="Buttons" style="list-style-type:none">
+                    @foreach (var item in Model.selectedFilters)
+                    {
+                        <li class="Button"><button onclick="removeFilter('@item.Name')">x</button></li>
+
+                    }
+                </ul>
+            </th>
+        </tr>
+    </table>
+    <button class="button-heatmap" onclick="Heatmap()" >Heatmap parameters</button>
+</body>
+
+</html>

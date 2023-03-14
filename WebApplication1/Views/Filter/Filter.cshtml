@@ -1,0 +1,82 @@
+﻿
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+
+<html>
+<script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>Filter</title>
+</head>
+<body>
+    <script>
+        function ButtonClick() {
+            var s = "";
+            const elements = document.querySelectorAll('.inputText');
+            Array.from(elements).forEach((element) => {
+                var id = element.getAttribute('id');                       
+                var el = document.getElementById(id).value;
+                s += id + '=' + el + ';';                
+            });
+            const elementsChecked = document.querySelectorAll('.inputCheck');
+            Array.from(elementsChecked).forEach((element) => {
+                var id = element.getAttribute('id');
+                var el="false"
+                if (document.getElementById(id).checked)
+                    el ="true";
+                s += id + '=' + el + ';';
+            });
+
+
+            console.log(s);
+
+            $.post('@Url.Action("SaveParameters","Filter")', { s: s }).done(function (data, textStatus, jqXHR) {
+                window.location.href = '/List/Index';
+            });;
+        }
+    </script>
+    <div>
+        @if (Model.types != null)
+        {
+            foreach (var item in Model.types)
+            {
+                if (item.Value == typeof(int) || item.Value == typeof(double))
+                {
+                    if (Model.values != null && Model.values.Count > 0)
+                    {
+                        string xx = Model.values[item.Key];
+                        <label>@item.Key</label> <input class="inputText" type="text" id='@item.Key' name='@item.Key' value='@xx'>
+                    }
+                    else
+                    {
+                        <label>@item.Key</label> <input class="inputText" type="text" id='@item.Key' name='@item.Key'>
+                    }
+                    <br /> <br />
+                }
+                else
+                    if (item.Value == typeof(bool))
+                {
+                    <br />
+                    <input type="checkBox" class="inputCheck" id='@item.Key' name='@item.Key' value="true">
+                    <label> @item.Key</label><br />
+                }
+                else
+                {
+                    <select class="inputText" id="Coding algorithm">
+                        @foreach (var it in WebApplication1.Models.FilterModel.coding)
+                        {
+                            <option name=@it value=@it>@it</option>
+                        }
+                    </select>
+                }
+
+            }
+        }
+        <button onclick="ButtonClick()">Submit</button>
+
+    </div>
+</body>
+</html>
