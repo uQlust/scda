@@ -35,7 +35,7 @@ namespace WebApplication1.Controllers
             string[] x = s.Split(';');
             for(int i=0;i<x.Length-1;i++)
             {
-                string[] aux = x[i].Split('=');                
+                string[] aux = x[i].Split('=');
                 dic.Add(aux[0], aux[1]);
             }
 

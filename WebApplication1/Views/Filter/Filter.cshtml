@@ -55,7 +55,7 @@
                         <label>@item.Key</label> <input class="inputText" type="text" id='@item.Key' name='@item.Key'>
                     }
                     <br /> <br />
-                }
+                    }
                 else
                     if (item.Value == typeof(bool))
                 {
@@ -65,12 +65,12 @@
                 }
                 else
                 {
-                    <select class="inputText" id="Coding algorithm">
-                        @foreach (var it in WebApplication1.Models.FilterModel.coding)
+        <select class="inputText" id="Coding algorithm">
+            @foreach (var it in WebApplication1.Models.FilterModel.coding)
                         {
-                            <option name=@it value=@it>@it</option>
+            <option name=@it value=@it>@it</option>
                         }
-                    </select>
+        </select>
                 }
 
             }

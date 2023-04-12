@@ -127,6 +127,7 @@ namespace WebApplication1.Controllers
         }
         public ActionResult SetupSelection(string m)
         {
+            Dictionary<string, Type> filterParams = null;
             foreach (var item in model.selectedFilters)
             {
                 if (item.Name.Contains(m))

@@ -42,8 +42,8 @@ namespace Graph
                     button9.Enabled = true;
                     foreach (var item in openFileDialog1.FileNames)
                         if (checkBox1.Checked)
-                            //omicsFiles.Items.Add(file.GetOmicsFile(item));
-                            omicsFiles.Items.Add(file.GetOmicsSpareFile(item));
+                        //omicsFiles.Items.Add(file.GetOmicsFile(item));
+                        omicsFiles.Items.Add(file.GetOmicsSpareFile(item));
                         else
                             omicsFiles.Items.Add(file.GetOmicsFile(item));
 
@@ -236,8 +236,8 @@ namespace Graph
                     if (aux.filters.Count > 0)
                     {
                         var res = aux.ApplyFilters(aux.filters);
-                        omicsFiltered.Add(res);
-                    }
+                    omicsFiltered.Add(res);
+                }
                     else
                         omicsFiltered.Add(aux);
                 }
@@ -245,7 +245,7 @@ namespace Graph
                 //DataForm.CheckRanking(joined, 100);
                 OmicsDataSet.CheckRanking(joined, 100, "order");
                 if (FilterOmics.remData)
-                    FilterOmics.memoryFilteredData.Add(joined);
+                FilterOmics.memoryFilteredData.Add(joined);
                 joined.filters = jFilters;
                 Settings set;
                 set = new Settings();

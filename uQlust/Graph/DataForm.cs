@@ -82,7 +82,7 @@ namespace Graph
             {
                 string line = tabString[l].Replace("\"", "");
                 if (l == (int)labelRow)
-                {                 
+                {
                     aux = line.Split(separators);
                     lock (labRow)
                     {
@@ -135,7 +135,8 @@ namespace Graph
             //locData.Clear();
 
             string line = sr.ReadLine();
-            string[] aux = null;            
+            string[] aux = null;
+           
             tabString[0] = line;
             int x = 1;
             while (!sr.EndOfStream)
@@ -171,9 +172,10 @@ namespace Graph
 
             data.data = sp;
             data.data.columns = data.geneLabels.Count;
-            
+
             return data;
         }
+
         public OmicsDataSet GetOmicsFile(string fileName)
         {
             string[] tabString = new string[20000];

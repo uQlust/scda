@@ -40,7 +40,7 @@ namespace UnitTestProject1
 
             //QuantileColumn q = new QuantileColumn();
             QuantileRow q = new QuantileRow();
-
+            
             OmicsDataSet o = q.ApplyFilter(setO);
             System.Diagnostics.Debug.WriteLine("");
             o.data.Print();
