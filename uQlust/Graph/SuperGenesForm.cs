@@ -107,7 +107,7 @@ namespace Graph
             StreamReader sr = new StreamReader(fileName);
 
             Dictionary<string, int> hashGeneNames = new Dictionary<string, int>();
-            
+
             for (int i = 0; i < genes.Count; i++)
                 hashGeneNames.Add(genes[i], i);
 

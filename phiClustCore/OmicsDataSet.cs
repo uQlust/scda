@@ -9,6 +9,16 @@ using System.Threading.Tasks;
 
 namespace phiClustCore
 {
+    class SpareValue
+    {
+        public int index;
+        public double value;
+
+        public SpareValue(int i,double v)
+        {
+            index = i;value = v;
+        }
+    }
     public class SpareArray : ICloneable
     {
         float[,] data = null;
@@ -27,7 +37,7 @@ namespace phiClustCore
             if (spareFlag)
             {
                 dicData = new Dictionary<int, float>[source.dicData.Length];
-                for (int i = 0; i < dicData.Length; i++)
+            for (int i = 0; i < dicData.Length; i++)
                     dicData[i] = new Dictionary<int, float>(source.dicData[i].Count);
             }
             else
@@ -216,6 +226,7 @@ namespace phiClustCore
 
             if (spareFlag)
             {
+                int counter = 0;
                 for (int i = 0; i < dicData.Length; i++)
                 {
                     foreach (var item in dicData[i].Keys)
@@ -232,8 +243,8 @@ namespace phiClustCore
                     
             }
 
-            return counter;
-        }
+                return counter;
+            }
         public SpareArray CopyRows(List<int> index)
         {
             SpareArray res = new SpareArray(index.Count,columns, spareFlag);
@@ -266,7 +277,7 @@ namespace phiClustCore
                     {
                         if (h.ContainsKey(item.Key))
                             count++;
-                    }
+        }
                     res.dicData[i] = new Dictionary<int, float>(count);
                     foreach (var item in dicData[i])
                     {
@@ -294,6 +305,12 @@ namespace phiClustCore
 
             if (spareFlag)
             {
+                trans.valuePos = new Dictionary<double, int>();
+                foreach (var item in valuePos)
+                    trans.valuePos.Add(item.Key, item.Value);
+
+                trans.values = new List<double>(values);
+
                 for (int i = 0; i < dicData.Length; i++)
                 {
                     foreach (var it in dicData[i])
@@ -371,7 +388,7 @@ namespace phiClustCore
                         foreach (var item in dicData[i])
                             sum += item.Value;
 
-                        foreach (var item in dicData[i])
+                                foreach (var item in dicData[i])
                             res[i, item.Key] = item.Value / sum;                        
                 }
             }
@@ -399,8 +416,12 @@ namespace phiClustCore
                 {
                     res.dicData[i] = new Dictionary<int, float>(dicData[i].Count);
                     double sum = 0;
+                    //foreach (var item in dicData[i])
+                    //  sum += values[item.Value];
+                    // lock (res.values) lock (res.valuePos)
+                    {
 
-                    foreach (var item in dicData[i])
+                        foreach (var item in dicData[i])
                         res[i, item.Key] = (float)Math.Log(item.Value * 10000 + 1);
                 }
             }
@@ -409,7 +430,10 @@ namespace phiClustCore
                 for (int i = start; i < end; i++)
                 {
                     double sum = 0;
-                    
+                    //for (int j = 0; j < columns; j++)
+                    //  sum += this[i, j];
+                    // lock (res.values) lock (res.valuePos)
+
                     for (int j = 0; j < columns; j++)
                         res[i, j] = (float)Math.Log(this[i, j] * 10000 + 1);
 
@@ -439,7 +463,7 @@ namespace phiClustCore
 
         public SpareArray NormalizeRows()
         {
-            SpareArray res = null;
+            SpareArray res = null;            
             res = new SpareArray(this);
             
 
@@ -800,11 +824,15 @@ namespace phiClustCore
 
             int row = 0;
             for (int i=0;i<omicsData.Count;i++)
-            {                
+            {
+                
                 aux = omicsData[i];
                 res.sampleLabels.AddRange(aux.sampleLabels);
                 res.data.Add(aux.data,row);
                 row += aux.data.rows;
+                /*for (int k = 0; k < aux.data.rows; n++, k++)
+                    for (int j = 0; j < aux.data.columns; j++)
+                        res.data[n, j] = aux.data[k, j];*/
             }
             if (omicsData[0].codes != null)
             {

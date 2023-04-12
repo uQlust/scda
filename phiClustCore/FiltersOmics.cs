@@ -56,11 +56,11 @@ namespace phiClustCore
         {
             return "Qunatile column normalization";
         }
-        void QuantileThread(int [,] rankData,int [,] rank,SpareArray data,float []avr,int start, int end)
-        {
+        void QuantileThread(SpareArray rankData,SpareArray data,double []avr,int []count,int start, int end)
+        {            
             Dictionary<double, int> valToRank = new Dictionary<double, int>(500);
             for (int i = start; i < end; i++)
-            {
+            {                
 
                 valToRank.Clear();
                 var colTuple = data.GetColumnValues(i);
@@ -85,7 +85,8 @@ namespace phiClustCore
                 Array.Sort<int>(index, (a, b) => val[a].CompareTo(val[b]));
                 Array.Reverse(index);
                 //index.Reverse();
-                
+                Dictionary<double, int> valToRank = new Dictionary<double, int>();
+
 
                 int k = 1;
                 foreach (var item in index)
@@ -93,7 +94,7 @@ namespace phiClustCore
                     valToRank.Add(val[item], k);
                     k += diffValues[val[item]];
                 }
-                
+
                 for (int j = 0; j < copyData.Length; j++)
                     if (data[copyData[j], i] != 0)
                         lock (lockObj)
@@ -147,29 +148,41 @@ namespace phiClustCore
                 int e = (int)(step * (i + 1));
                 t[i] = Task.Run(() => QuantileThread(rankAll,rank,data,avr,s, e));
             }
-            Task.WaitAll(t);
+            Task.WaitAll(t); 
 
             for (int i = 0; i < avr.Length; i++)
                     avr[i] /= data.columns;
 
+                HashSet<double> diffValues = new HashSet<double>();
+                foreach (var item in columnValues)
+                    diffValues.Add(item);
 
             float[] vTab = new float[rankData.rows];
             int[] countI = new int[vTab.Length];
             for (int j = 0; j < rankData.columns; j++)
-            {
-                for (int i = 0; i < vTab.Length; i++)
                 {
+                for (int i = 0; i < vTab.Length; i++)
+                    {
                     vTab[i] = 0;
                     countI[i] = 0;
-                }
+                    }
                 for (int i = 0; i < rank.GetLength(0); i++)
                     if (rank[i, j] > 0)
                     {
                         vTab[rank[i, j] - 1] += avr[rankAll[i, j] - 1];
                         countI[rank[i, j] - 1]++;
-                    }
+                }
 
-                for (int i = 0; i < rankData.rows; i++)
+
+            }*/
+            // rankData.Print();
+            for (int i = 0; i < avr.Length; i++)
+                if (count[i] > 0)
+                    avr[i] /= count[i];// data.columns;// count[i];
+
+
+
+            for (int i = 0; i < rankData.rows; i++)
                     if(rank[i,j]>0)
                         rankData[i, j] = vTab[rank[i, j] - 1] /countI[rank[i, j] - 1];
 
@@ -189,7 +202,7 @@ namespace phiClustCore
             res.sampleLabels = dataS.sampleLabels;
 
             if(remData)
-                memoryFilteredData.Add(res);
+            memoryFilteredData.Add(res);
 
             return res;
         }
@@ -216,7 +229,7 @@ namespace phiClustCore
             res.sampleLabels = dataS.sampleLabels;
 
             if(remData)
-                memoryFilteredData.Add(res);
+            memoryFilteredData.Add(res);
             //res.Save("Quantile");
             return res;
         }
@@ -419,7 +432,7 @@ namespace phiClustCore
 
     }
     public class TopDevGenes : FilterOmics
-    {
+                        {
         int threshold = 0;
 
         public TopDevGenes()
@@ -444,7 +457,7 @@ namespace phiClustCore
             v.Add("Threshold", threshold.ToString());
 
             return v;
-        }
+                        }
         public override string ToString()
         {
             return "Top best genes";
@@ -471,7 +484,7 @@ namespace phiClustCore
             int[] index = new int[colDev.Length];
             for (int i = 0, k = 0; i < data.columns; i++)
                 if (!omitGenes.Contains(i))
-                {
+                        {
                     colDev[k] = colDevOrg[i];
                     index[k++] = i;
 
@@ -502,7 +515,7 @@ namespace phiClustCore
             res.intervals.Add(intv);
 
             if(remData)
-                memoryFilteredData.Add(res);
+            memoryFilteredData.Add(res);
 
             return res;
         }
@@ -572,7 +585,7 @@ namespace phiClustCore
             res.intervals.Add(intv);
 
             if(remData)
-                memoryFilteredData.Add(res);
+            memoryFilteredData.Add(res);
 
             return res;
         }
@@ -735,7 +748,7 @@ namespace phiClustCore
             intv[1].code = 1;
             res.intervals.Add(intv);
             if(remData)
-                memoryFilteredData.Add(res);
+            memoryFilteredData.Add(res);
 
             return res;
         }
@@ -805,7 +818,34 @@ namespace phiClustCore
             {
                 if (data.RowsDataNumber(j) < threshold)
                     count++;
+                }
                 else
+                    index[j] = true;
+            }
+
+            /*  Task<int> []t = new Task<int>[5];
+
+              float step = data.rows / 5.0f;
+
+              for (int i = 0; i < 5; i++)
+              {
+                  int s = (int)(step * i);
+                  int e = (int)(step * (i + 1));
+                  t[i] = Task.Run(()=>CountTh(s,e,data));
+              }
+              Task.WaitAll(t);
+              int cc = 0;
+              for (int i = 0; i < 5; i++)
+                  cc += t[i].Result;
+            */
+
+            res.data = new SpareArray(data.rows - count, data.columns, data.spareFlag);
+            count = 0;
+            res.sampleLabels = new List<string>();
+
+            for (int j = 0; j < data.rows; j++)
+            {
+                if (index[j])
                 {
                     index.Add(j);
                     res.sampleLabels.Add(dataS.sampleLabels[j]);
@@ -827,7 +867,7 @@ namespace phiClustCore
             intv[1].code = 1;
             res.intervals.Add(intv);
             if(remData)
-                memoryFilteredData.Add(res);
+            memoryFilteredData.Add(res);
 
             return res;
         }
@@ -923,7 +963,7 @@ namespace phiClustCore
             intv[1].code = 1;
             res.intervals.Add(intv);
             if(remData)
-                memoryFilteredData.Add(res);
+            memoryFilteredData.Add(res);
 
             //res.Save("SuperGenes");
 
@@ -976,7 +1016,7 @@ namespace phiClustCore
             res.geneLabels = dataS.geneLabels;
             res.sampleLabels = dataS.sampleLabels;
             if(remData)
-                memoryFilteredData.Add(res);
+            memoryFilteredData.Add(res);
 
             return res;
         }
@@ -1205,16 +1245,16 @@ namespace phiClustCore
                 //Zróbmy normalizację col
                 if (maxV != 0)
                 {
-                    for (int n = 0; n < col.Length; n++)
-                        col[n] /= maxV;
+                for (int n = 0; n < col.Length; n++)
+                    col[n] /= maxV;
 
-                    var h = NegativeBinomialFit(col, true, maxV);
+                var h = NegativeBinomialFit(col, true, maxV);
 
-                    for (int n = 0; n < col.Length; n++)
-                        col[n] *= maxV;
+                for (int n = 0; n < col.Length; n++)
+                    col[n] *= maxV;
 
-                    avr = h.Item1;
-                    stdev = h.Item2;
+                avr = h.Item1;
+                stdev = h.Item2;
                 }
                 else
                 {
@@ -1258,18 +1298,18 @@ namespace phiClustCore
                 if (codingColumn)
                 {
 
-                    for (int i = 0; i < data.columns; i++)
+                for (int i = 0; i < data.columns; i++)
+                {
+                    hashValues.Clear();
+                    for (int j = 0; j < data.rows; j++)
                     {
-                        hashValues.Clear();
-                        for (int j = 0; j < data.rows; j++)
-                        {
 
-                            if (!hashValues.Keys.Contains(data[j, i]))
-                                hashValues.Add(data[j, i], 1);
-                            else
-                                hashValues[data[j, i]]++;
-                        }
-                        intv = SetupIntervals(hashValues, NumStates, Coding);
+                        if (!hashValues.Keys.Contains(data[j, i]))
+                            hashValues.Add(data[j, i], 1);
+                        else
+                            hashValues[data[j, i]]++;
+                    }
+                    intv = SetupIntervals(hashValues, NumStates, Coding);
                         var codedColumn = IntervalCodigPerGene(data, i, intv);
                         for (int k = 0; k < codedColumn.Length; k++)
                             outData[k, i] = codedColumn[k];
@@ -1291,13 +1331,13 @@ namespace phiClustCore
                                 hashValues[data[i, j]]++;
                         }
                         intv = SetupIntervals(hashValues, NumStates, Coding);
-                        var codedRow = IntervalCodigPerSample(data, i, intv);
-                        for (int k = 0; k < codedRow.Length; k++)
+                    var codedRow = IntervalCodigPerSample(data, i, intv);
+                    for (int k = 0; k < codedRow.Length; k++)
                             outData[i,k] = codedRow[k];
-                        intervals.Add(intv);
+                    intervals.Add(intv);
 
 
-                    }
+                }
                 }
 
             }
@@ -1309,7 +1349,7 @@ namespace phiClustCore
             res.AddCodes(intervals[0]);
 
             if(remData)
-                memoryFilteredData.Add(res);
+            memoryFilteredData.Add(res);
             //res.Save("Discr");
             return res;
         }
@@ -1520,7 +1560,7 @@ namespace phiClustCore
             res.sampleLabels = dataS.sampleLabels;
             res.data = data;
             if(remData)
-                memoryFilteredData.Add(res);
+            memoryFilteredData.Add(res);
             return res;
         }
     }
@@ -1614,7 +1654,7 @@ namespace phiClustCore
             res.geneLabels = dataS.geneLabels;
             res.sampleLabels = dataS.sampleLabels;
             if(remData)
-                memoryFilteredData.Add(res);
+            memoryFilteredData.Add(res);
             return res;
         }
 
@@ -1678,7 +1718,7 @@ namespace phiClustCore
             res.geneLabels = dataS.geneLabels;
             res.sampleLabels = dataS.sampleLabels;
             if(remData)
-                memoryFilteredData.Add(res);
+            memoryFilteredData.Add(res);
 
             return res;
         }
@@ -1727,12 +1767,44 @@ namespace phiClustCore
         public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
         {
             OmicsDataSet res = new OmicsDataSet(dataS.Name + "_" + ToString());
- 
+
+            /*SpareArray data; = new SpareArray(dataS.data.rows, dataS.data.columns, dataS.data.spareFlag);
+
+            Task[] t = new Task[cores];
+            float step = data.rows / ((float)cores);
+
+            for (int i = 0; i < cores; i++)
+            {
+                int s = (int)(step * i);
+                int e = (int)(step * (i + 1));
+                t[i] = Task.Run(() => NormalizeRow(s, e,dataS.data,data));
+            }
+            Task.WaitAll(t);*/
+
+
+
+
+
+            /*            for (int i = 0; i < dataS.data.rows; i++)
+                        {
+                            //double max =Double.MinValue ;
+                            double sum = 0;
+                            for (int j = 0; j < dataS.data.columns; j++)
+                                sum += dataS.data[i, j];
+
+                            for (int j = 0; j < dataS.data.columns; j++)
+                                if(dataS.data[i,j]!=0)
+                                    data[i, j] = dataS.data[i,j]/sum;
+
+                        }*/
+
+            //res.data = data;
+
             res.data = dataS.data.NormalizeRows();
             res.geneLabels = dataS.geneLabels;
             res.sampleLabels = dataS.sampleLabels;
             if(remData)
-                memoryFilteredData.Add(res);
+            memoryFilteredData.Add(res);
 
 
             //res.Save("Normalization");

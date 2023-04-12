@@ -102,11 +102,11 @@ namespace Graph
             {
                 dataSet = new double[omData.data.rows];
                 index = new int[dataSet.Length];
-                for (int i = 0; i < dataSet.Length; i++)
-                {
-                    dataSet[i] = omData.data[i, comboBox1.SelectedIndex];
-                    index[i] = i;
-                }
+            for (int i = 0; i < dataSet.Length; i++)
+            {
+                dataSet[i] = omData.data[i, comboBox1.SelectedIndex];
+                index[i] = i;
+            }
             }
             else
             {
@@ -316,8 +316,8 @@ namespace Graph
                 comboBox1.Items.Clear();
                 if (!checkBox1.Checked)
                 {
-                    foreach (var item in omData.geneLabels)
-                        comboBox1.Items.Add(item);
+                foreach (var item in omData.geneLabels)
+                    comboBox1.Items.Add(item);
                 }
                 else
                     foreach (var item in omData.sampleLabels)
