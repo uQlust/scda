@@ -27,7 +27,7 @@ namespace phiClustCore
             if (spareFlag)
             {
                 dicData = new Dictionary<int, float>[source.dicData.Length];
-                for (int i = 0; i < dicData.Length; i++)
+            for (int i = 0; i < dicData.Length; i++)
                     dicData[i] = new Dictionary<int, float>(source.dicData[i].Count);
             }
             else
@@ -232,8 +232,8 @@ namespace phiClustCore
 
             }
 
-            return counter;
-        }
+                return counter;
+            }
         public SpareArray CopyRows(List<int> index)
         {
             SpareArray res = new SpareArray(index.Count, columns, spareFlag);
@@ -266,7 +266,7 @@ namespace phiClustCore
                     {
                         if (h.ContainsKey(item.Key))
                             count++;
-                    }
+        }
                     res.dicData[i] = new Dictionary<int, float>(count);
                     foreach (var item in dicData[i])
                     {

@@ -60,7 +60,7 @@ namespace phiClustCore
         {
             Dictionary<double, int> valToRank = new Dictionary<double, int>(500);
             for (int i = start; i < end; i++)
-            {
+            {                
 
                 valToRank.Clear();
                 var colTuple = data.GetColumnValues(i);
@@ -156,18 +156,18 @@ namespace phiClustCore
             float[] vTab = new float[rankData.rows];
             int[] countI = new int[vTab.Length];
             for (int j = 0; j < rankData.columns; j++)
-            {
-                for (int i = 0; i < vTab.Length; i++)
                 {
+                for (int i = 0; i < vTab.Length; i++)
+                    {
                     vTab[i] = 0;
                     countI[i] = 0;
-                }
+                    }
                 for (int i = 0; i < rank.GetLength(0); i++)
                     if (rank[i, j] > 0)
                     {
                         vTab[rank[i, j] - 1] += avr[rankAll[i, j] - 1];
                         countI[rank[i, j] - 1]++;
-                    }
+                }
 
                 for (int i = 0; i < rankData.rows; i++)
                     if (rank[i, j] > 0)
@@ -419,7 +419,7 @@ namespace phiClustCore
 
     }
     public class TopDevGenes : FilterOmics
-    {
+                        {
         int threshold = 0;
 
         public TopDevGenes()
@@ -444,7 +444,7 @@ namespace phiClustCore
             v.Add("Threshold", threshold.ToString());
 
             return v;
-        }
+                        }
         public override string ToString()
         {
             return "Top best genes";
@@ -471,7 +471,7 @@ namespace phiClustCore
             int[] index = new int[colDev.Length];
             for (int i = 0, k = 0; i < data.columns; i++)
                 if (!omitGenes.Contains(i))
-                {
+                        {
                     colDev[k] = colDevOrg[i];
                     index[k++] = i;
 
@@ -1205,16 +1205,16 @@ namespace phiClustCore
                 //Zróbmy normalizację col
                 if (maxV != 0)
                 {
-                    for (int n = 0; n < col.Length; n++)
-                        col[n] /= maxV;
+                for (int n = 0; n < col.Length; n++)
+                    col[n] /= maxV;
 
-                    var h = NegativeBinomialFit(col, true, maxV);
+                var h = NegativeBinomialFit(col, true, maxV);
 
-                    for (int n = 0; n < col.Length; n++)
-                        col[n] *= maxV;
+                for (int n = 0; n < col.Length; n++)
+                    col[n] *= maxV;
 
-                    avr = h.Item1;
-                    stdev = h.Item2;
+                avr = h.Item1;
+                stdev = h.Item2;
                 }
                 else
                 {
@@ -1258,18 +1258,18 @@ namespace phiClustCore
                 if (codingColumn)
                 {
 
-                    for (int i = 0; i < data.columns; i++)
+                for (int i = 0; i < data.columns; i++)
+                {
+                    hashValues.Clear();
+                    for (int j = 0; j < data.rows; j++)
                     {
-                        hashValues.Clear();
-                        for (int j = 0; j < data.rows; j++)
-                        {
 
-                            if (!hashValues.Keys.Contains(data[j, i]))
-                                hashValues.Add(data[j, i], 1);
-                            else
-                                hashValues[data[j, i]]++;
-                        }
-                        intv = SetupIntervals(hashValues, NumStates, Coding);
+                        if (!hashValues.Keys.Contains(data[j, i]))
+                            hashValues.Add(data[j, i], 1);
+                        else
+                            hashValues[data[j, i]]++;
+                    }
+                    intv = SetupIntervals(hashValues, NumStates, Coding);
                         var codedColumn = IntervalCodigPerGene(data, i, intv);
                         for (int k = 0; k < codedColumn.Length; k++)
                             outData[k, i] = codedColumn[k];
