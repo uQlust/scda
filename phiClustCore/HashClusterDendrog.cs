@@ -15,7 +15,7 @@ using System.Text.RegularExpressions;
 
 namespace phiClustCore
 {
-    class HashClusterDendrog:HashCluster,IProgressBar
+    public class HashClusterDendrog:HashCluster,IProgressBar
     {
          DistanceMeasures dMeasure;
          DistanceMeasure dist=null;
@@ -119,22 +119,53 @@ namespace phiClustCore
                 {
                     Console.WriteLine("UPS");
                 }
-                dicStruct.Add(output.juryLike[0].Key, data[output.juryLike[0].Key]);
-                if (translateToCluster.ContainsKey(output.juryLike[0].Key))
-                    Console.WriteLine();
-                translateToCluster.Add(output.juryLike[0].Key, new List<string>());               
-                translateToCluster[output.juryLike[0].Key].Add(output.juryLike[0].Key);
+                if (output == null)
+                    continue;
+                string rep = output.juryLike[0].Key;
+                if (dicStruct.ContainsKey(rep))
+                    if (output.juryLike.Count > 1)
+                        rep = output.juryLike[1].Key;
+                    else
+                        continue;
+                dicStruct.Add(rep, data[rep]);
+                translateToCluster.Add(rep, new List<string>());               
+                translateToCluster[rep].Add(rep);
                 if (item.Count > 2)
                  {                     
                      foreach (var i in item)
-                         if (!i.Equals(output.juryLike[0].Key))
-                            translateToCluster[output.juryLike[0].Key].Add(i);                     
+                         if (!i.Equals(rep))
+                            translateToCluster[rep].Add(i);                     
                  }
              }
             
 
              return new Tuple<Dictionary<string, List<string>>, Dictionary<string, List<double>>>(translateToCluster,dicStruct);
          }
+        public static ClusterOutput MakeDummyDendrog(List<List<string>> clusters)
+        {
+            ClusterOutput res = new ClusterOutput();
+
+            res.hNode = new HClusterNode();
+            res.hNode.joined = new List<HClusterNode>();
+            res.hNode.setStruct = new List<string>();
+            res.hNode.refStructure = clusters[0][0];
+            res.hNode.levelDist = 1.0;
+            res.hNode.color = System.Drawing.Color.Black;
+            for (int i=0;i<clusters.Count;i++)
+            {
+                HClusterNode aux = new HClusterNode();
+                aux.setStruct = clusters[i];
+                res.hNode.joined.Add(aux);
+                res.hNode.setStruct.AddRange(clusters[i]);
+                aux.parent = res.hNode;
+                aux.refStructure = aux.setStruct[0];
+                aux.levelDist = 0.0;
+                aux.color = System.Drawing.Color.Black;
+            }
+
+            return res;
+
+        }
         public ClusterOutput DendrogUsingMicroClusters(Dictionary<string, List<double>> dataFull,Dictionary<string, List<double>> data,Dictionary<string,List<string>> clustered)
          {
              ClusterOutput outC = null;
@@ -193,10 +224,9 @@ namespace phiClustCore
                         if (dataFull.ContainsKey(str))
                             item.setProfiles.Add(dataFull[str]);
                         else
-                            throw new Exception("ex");
+                            Console.WriteLine("Ups");
+                            //throw new Exception("ex");
                     }
-
-
 
                      item.consistency = CalcClusterConsistency(item.setStruct);
 

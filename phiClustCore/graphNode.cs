@@ -12,6 +12,7 @@ namespace phiClustCore
         public string refName;
         public int x, y;
         public int areaLeft, areaRight;
+        public int areaRange { get { return areaRight - areaLeft;} }
         int square = 8;
 
 

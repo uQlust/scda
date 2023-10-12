@@ -14,7 +14,7 @@ namespace phiClustCore
 {
     [Serializable]
 	public class HClusterNode
-	{
+	{        
 		public List <string> setStruct=new List<string>();
         public List<List<double>> setProfiles = new List<List<double>>();
 		public List <HClusterNode> joined=null;        
@@ -35,9 +35,7 @@ namespace phiClustCore
         public double levelDist;
         public double realDist;
         [NonSerialized]
-        public GraphNode gNode;
-        [NonSerialized]
-        public bool mark=false;
+        public GraphNode gNode;        
         int kMin;
 
         public HClusterNode()
@@ -63,7 +61,6 @@ namespace phiClustCore
             levelDist = node.levelDist;
             realDist = node.realDist;
             gNode = new GraphNode(node.gNode);
-            mark = node.mark;
             kMin = node.kMin;
         }
 
@@ -402,6 +399,65 @@ namespace phiClustCore
             return rootNode;
 
         }
+        public List<HClusterNode> FinPath(HClusterNode node)
+        {
+            List<HClusterNode> path = new List<HClusterNode>();
+            HashSet<HClusterNode> toRoot = new HashSet<HClusterNode>();
+            HClusterNode current = this;
+            HClusterNode common = null;
+            toRoot.Add(current);
+            while (current.parent != null)
+            {
+                current = current.parent;
+                toRoot.Add(current);
+            }
+
+            current = node;
+            while (current.parent != null)
+            {
+                current = current.parent;
+                if (toRoot.Contains(current))
+                {
+                    common = current;
+                    break;
+                }
+            }
+            if (common == null)
+                return null;
+
+            current = this;
+            path.Add(current);
+            while (current != common)
+            {
+                current = current.parent;
+                path.Add(current);
+            }
+            List<HClusterNode> aux = new List<HClusterNode>();
+            current = node;
+            aux.Add(current);
+            while (current != common)
+            {
+                current = current.parent;
+                aux.Add(current);
+            }
+            for (int i = aux.Count - 2; i >= 0; i--)
+                path.Add(aux[i]);
+            return path;
+        }
+        public void MakeInvisible()
+        {
+            Stack<HClusterNode> st = new Stack<HClusterNode>();
+            st.Push(this);
+            while (st.Count != 0)
+            {
+                var current = st.Pop();
+                current.visible = false;
+                if (current.joined != null)
+                    foreach (var item in current.joined)
+                        st.Push(item);
+            }
+
+        }
         public Dictionary<HClusterNode,System.Drawing.Color> CutDendrog(int distThreshold)
         {
             Dictionary<HClusterNode, System.Drawing.Color> returnList = new Dictionary<HClusterNode,System.Drawing.Color>();
@@ -469,7 +525,7 @@ namespace phiClustCore
 
         }
 
-        public List<HClusterNode> GetLeaves()
+        public List<HClusterNode> GetLeaves(bool visibilityFlag=true)
         {
             List<HClusterNode> listH = new List<HClusterNode>();
             Stack<HClusterNode> st = new Stack<HClusterNode>();
@@ -482,6 +538,12 @@ namespace phiClustCore
                 if (current.joined != null)
                     foreach (var item in current.joined)
                         st.Push(item);
+                else
+                    if (visibilityFlag)
+                {
+                    if (current.visible)
+                        listH.Add(current);
+                }
                 else
                     listH.Add(current);
             }

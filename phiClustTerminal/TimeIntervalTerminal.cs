@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
 
-namespace phiClustTerminal
+namespace singleCellAnalisysTerminal
 {
     class TimeIntervalTerminal
     {

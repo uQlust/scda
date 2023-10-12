@@ -8,6 +8,7 @@ using System.Collections.Specialized;
 using System.Collections.Generic;
 using System.Xml.Serialization;
 using System.Drawing;
+using phiClustCore.Distance;
 
 namespace phiClustCore
 {
@@ -42,6 +43,7 @@ namespace phiClustCore
         public clusterRes clusters = null;
         public clusterRes clusters2 = null;
         public Dictionary<string, List<double>> profiles = null;
+        public DistanceMeasure distM=null;
 
 
         public clusterRes ClustersUpper {get{return clusters;} }

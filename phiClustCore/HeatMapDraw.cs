@@ -284,7 +284,8 @@ namespace phiClustCore
 
             double yPos1Ref = 0;
             double yPos2Ref = 0;
-            for (int i = 0; i < leftLeaves.Count; i++)
+            foreach (var leftItem in leftLeaves)
+                //for (int i = 0; i < leftLeaves.Count; i++)
             {
                 yPos1Ref = leftItem.gNode.areaLeft;
                 yPos2Ref = leftItem.gNode.areaRight;
