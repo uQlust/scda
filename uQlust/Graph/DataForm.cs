@@ -61,6 +61,7 @@ namespace Graph
                 line = sr.ReadLine();
             }
             sr.Close();
+            SplitData();
 
         }
         /*void ParseLines(int start,int end,string []tabString)

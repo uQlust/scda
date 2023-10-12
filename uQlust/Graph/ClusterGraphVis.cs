@@ -102,7 +102,7 @@ namespace Graph
                 }
                 else
                 {
-                    if (active == null || !(active is ListVisual))
+                    if (output.nodes!=null && output.nodes.Count!=2 &&(active == null || !(active is ListVisual)))
                     {
                         ListVisual visBaker;
                         visBaker = new ListVisual(output, item, dic);
@@ -114,7 +114,15 @@ namespace Graph
                 }
             }
 
+            if (output.nodes != null)
+            {
+                HeatMap heatRes = new HeatMap(output.nodes[0], output.nodes[1], null, output);
+                heatRes.PrepareDataForHeatMap();
+                active = heatRes;
+                heatRes.Show();
 
+            }
+            else
             if (output.juryLike != null || output.hNNRes != null)
                 {
                     if (active == null || !(active is FormText))
@@ -133,14 +141,7 @@ namespace Graph
                         showRes.Show();
                     }
                 }
-                if (output.nodes != null)
-                {                   
-                    HeatMap heatRes = new HeatMap(output.nodes[0], output.nodes[1], null, output);
-                    heatRes.PrepareDataForHeatMap();
-                    active = heatRes;
-                    heatRes.Show();
-
-                }
+              
             //}
 
         }

@@ -280,12 +280,12 @@ namespace phiClustCore
             upperLeaves = upperLeaves.OrderByDescending(o => o.gNode.x).Reverse().ToList();
             leftLeaves = leftLeaves.OrderByDescending(o => o.gNode.y).Reverse().ToList();
             SolidBrush b = new SolidBrush(Color.Black);
-            double yPos1, yPos2;
+            double yPos1, yPos2;          
 
             double yPos1Ref = 0;
             double yPos2Ref = 0;
-            foreach (var leftItem in leftLeaves)
-                //for (int i = 0; i < leftLeaves.Count; i++)
+            foreach(var leftItem in leftLeaves)
+            //for (int i = 0; i < leftLeaves.Count; i++)
             {
                 yPos1Ref = leftItem.gNode.areaLeft;
                 yPos2Ref = leftItem.gNode.areaRight;

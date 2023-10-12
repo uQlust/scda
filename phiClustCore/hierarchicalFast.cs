@@ -129,11 +129,16 @@ namespace phiClustCore
                 node.realDist = dMeasure.GetRealValue(node.levelDist);
                 levelNodes.Add(node);
             }
+            List<HClusterNode> cc = new List<HClusterNode>();
+
+            List<Tuple<int, HClusterNode, HClusterNode>> distKK = dMeasure.FindMinimalDistanceReference(cc);
+
             maxV = levelNodes.Count + 1;
             level.Add(levelNodes);
             HashSet<string> availableStruct = new HashSet<string>(structures);
             List<Tuple<int, HClusterNode, HClusterNode>> distK = dMeasure.FindMinimalDistanceReference(levelNodes);
-            HashSet<string> allIndx = new HashSet<string>();
+            HashSet<string> tabuRefernce = new HashSet<string>();
+            HashSet<string> levelRef = new HashSet<string>();
             int n = 0;
             while (n<distK.Count)
             {
@@ -143,38 +148,53 @@ namespace phiClustCore
 
                 while (k+1<distK.Count-1 && distK[k+1].Item1 == min)
                     k++;
-                
+                levelRef.Clear();
+
                 //allIndx=new 
                 for(int i=n;i<=k;i++)
                 {
-                    HashSet<HClusterNode> indexes = new HashSet<HClusterNode>();
-                    if (allIndx.Contains(distK[i].Item2.refStructure) || allIndx.Contains(distK[i].Item3.refStructure))
+         
+                        HashSet<HClusterNode> indexes = new HashSet<HClusterNode>();
+                    if (tabuRefernce.Contains(distK[i].Item2.refStructure) || tabuRefernce.Contains(distK[i].Item3.refStructure))
                         continue;
+
+                    if (levelRef.Contains(distK[i].Item2.refStructure) || levelRef.Contains(distK[i].Item3.refStructure))
+                        continue;
+
                     indexes.Clear();
                     indexes.Add(dicH[distK[i].Item2.refStructure]);
                     indexes.Add(dicH[distK[i].Item3.refStructure]);
 
-/*                    for(int s=i+1;s<=k;s++)
+                    for (int z = i + 1; z <= k; z++)
                     {
-//                        if (allIndx.Contains(distK[s].Item2) || allIndx.Contains(distK[s].Item3))
-//                            continue;
+                        var itt = distK[z];
 
-                        if (indexes.Contains(distK[s].Item2) || indexes.Contains(distK[s].Item3))
-                        {
-                            indexes.Add(distK[s].Item2);
-                            indexes.Add(distK[s].Item3);
+                        if (indexes.Contains(dicH[distK[z].Item2.refStructure]))
+                        {                            
+                            if (!levelRef.Contains(distK[z].Item3.refStructure))
+                                if(!tabuRefernce.Contains(distK[z].Item3.refStructure))
+                                    indexes.Add(dicH[distK[z].Item3.refStructure]);
                         }
-                            
-                    }*/
+                        if (indexes.Contains(dicH[distK[z].Item3.refStructure]))
+                        {
+                            if (!levelRef.Contains(distK[z].Item2.refStructure))
+                                if(!tabuRefernce.Contains(distK[z].Item2.refStructure))
+                                indexes.Add(dicH[distK[z].Item2.refStructure]);
+                        }
+                    }
+
+                    foreach(var item in indexes)
+                        levelRef.Add(item.refStructure);                    
+
                     if (indexes.Count > 0)
                     {
                         HClusterNode nodeTmp = new HClusterNode();
                         nodeTmp.levelDist = min;
                         nodeTmp.realDist = dMeasure.GetRealValue(min);
                         nodeTmp.joined = new List<HClusterNode>();
+                        HashSet<string> test = new HashSet<string>();
                         foreach (var item in indexes)
                         {
-
                             nodeTmp.setStruct.AddRange(item.setStruct);
                             nodeTmp.joined.Add(item);
                             //item.parent = nodeTmp;                           
@@ -183,38 +203,42 @@ namespace phiClustCore
                         }
                         var orderList = dMeasure.GetReferenceList(nodeTmp.setStruct);
                         for (int s = 0; s < orderList.Count; s++)
-                            if (!allIndx.Contains(orderList[s].Key))
+                            if (!tabuRefernce.Contains(orderList[s].Key))
                                 nodeTmp.refStructure = orderList[s].Key;
 
                         foreach (var item in indexes)
                         {
-                            if (item.refStructure != nodeTmp.refStructure)
-                                allIndx.Add(item.refStructure);
+                            foreach(var str in item.setStruct)
+                                if (str != nodeTmp.refStructure)
+                                    tabuRefernce.Add(str);
                         }
                             //nodeTmp.refStructure = orderList[0].Key;                      
                             //allIndx.Remove(nodeTmp.refStructure);
                         dicH[nodeTmp.refStructure] = nodeTmp;
                         //nodeTmp.joined = new List<HClusterNode>(indexes);
                         levelNodes.Add(nodeTmp);
+                        //if(levelRef.Contains(nodeTmp.refStructure))
+                        //    Console.WriteLine();
+                        //levelRef.Add(nodeTmp.refStructure);
+                        //allIndx.Add(nodeTmp.refStructure);
                     }
+                   
                 }
                 n = k + 1;
-                if (level.Count == 40)
-                    Console.WriteLine();
                 if (levelNodes.Count > 0)
                     level.Add(levelNodes);
 
-
-
+                
             }
 
 
             outCl.hNode = level[level.Count - 1][0];
             outCl.hNode.levelNum = 0;
 
+         
 
-
-
+            if (level[level.Count - 1][0].setStruct.Count != structures.Count)
+                throw new Exception("Wrong hierarchical clustering!");
             //At the end level num must be set properly
             Queue<HClusterNode> qq = new Queue<HClusterNode>();
             HClusterNode h;

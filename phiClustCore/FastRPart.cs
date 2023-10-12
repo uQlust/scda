@@ -51,8 +51,8 @@ namespace phiClustCore
             }*/
 
             //distance = new FastDiscreteDist(1, this.data);
-            distance = new Fast3States(1, this.data);
-            //distance = new Euclidian(data,true);
+            //distance = new Fast3States(1, this.data);
+            distance = new Euclidian(data,true);
         }
 
         public double ProgressUpdate()
@@ -70,11 +70,11 @@ namespace phiClustCore
         }
         public List<List<string>> FastCombineKeysNew(int clusterNum)
         {
-            Dictionary<string, List<int>> res = new Dictionary<string, List<int>>();
+            Dictionary<string, List<string>> res = new Dictionary<string, List<string>>();
             distance.InitMeasure();
             //List<string> structures = new List<string>(((FastDiscreteDist) distance).dataBaseKeys);
-            List<string> structures = new List<string>(((Fast3States)distance).dataBaseKeys);
-            //List<string> structures = new List<string>(data.Keys);
+            //List<string> structures = new List<string>(((Fast3States)distance).dataBaseKeys);
+            List<string> structures = new List<string>(data.Keys);
             jury1D jury = new jury1D();
             jury.PrepareJury(data);
             var jOut=jury.JuryOptWeights(structures).juryLike;
@@ -100,55 +100,44 @@ namespace phiClustCore
                     throw new Exception("all distances are 0");
                 distThreshold = distL[pos];
             }
-
-            int[] indexes = new int[structures.Count];
             
             while (remEnd-remStart>1)
             {
                 res.Clear();                
                 int n = 0;
                 prev = 0;
-                for (int i = 0; i < structures.Count; i++)
-                    indexUsed.Add(structures[i]);
 
                 string refStruct = jOut[0].Key;
-                while (indexUsed.Count > 0)
-                {
+                HashSet<string> locStructures = new HashSet<string>(structures);
+                List<string> locStr = new List<string>(locStructures);
+                while (locStructures.Count > 0)
+                {                    
                     int[] dist=null;
-                    List<int> cluster = new List<int>();
+                    List<string> cluster = new List<string>();
+                    int[] indexes = new int[locStructures.Count];
                         for (int i = 0; i < indexes.Length; i++)
                             indexes[i] = i;
-
-                        dist = distance.GetDistance(refStruct, structures);
-
+                        
+                        dist = distance.GetDistance(refStruct, locStr);
                         Array.Sort(dist, indexes);
                         
-                        cluster.Add(indexes[0]);
-                        indexUsed.Remove(structures[indexes[0]]);
-                    int k = 1;
-                        while (dist[k] <= distThreshold)
+                        cluster.Add(locStr[indexes[0]]);
+                        int k = 1;                        
+                        while (k<dist.Length && dist[k] <= distThreshold)
                         {
-                            if (indexUsed.Contains(structures[indexes[k]]))
-                            {
-                                cluster.Add(indexes[k]);
-                                indexUsed.Remove(structures[indexes[k]]);
-                            }
-                            k++;
+    
+                                cluster.Add(locStr[indexes[k]]);
+                                locStructures.Remove(locStr[indexes[k]]);
+                                k++;
                         }
+                        locStructures.Remove(refStruct);
                         res.Add(refStruct, cluster);
-                        refStruct = "";
-                        for (int i = n + 1; i < jOut.Count; i++)
-                            if (indexUsed.Contains(jOut[i].Key))
-                            {
-                                {
-                                    prev = n;
-                                    refStruct = jOut[i].Key;
-                                    
-                                    n = i;
-                                    break;
-                                }
-                            }
-                        
+                        if (locStructures.Count > 0)
+                        {
+                            locStr = new List<string>(locStructures);
+                            jOut = jury.JuryOptWeights(locStr).juryLike;
+                            refStruct = jOut[0].Key;
+                        }
                 }
                 if (res.Count > clusterNum)
                     remStart = pos;
@@ -164,8 +153,7 @@ namespace phiClustCore
             {
                 List<string> cl = new List<string>();
                 cl.Add(item.Key);
-                for (int i = 0; i < item.Value.Count;i++)
-                    cl.Add(structures[item.Value[i]]);
+                cl.AddRange(item.Value);
                 clusters.Add(cl);
             }
 

@@ -1109,7 +1109,7 @@ namespace phiClustCore
                 consensusStates[i] = new Dictionary<double, int>();
 
             int stepRef = 0;
-
+            refPoints = 100;
             if (refPoints > 0)
             {
                 stepRef = sorted.Count / refPoints;
@@ -2291,7 +2291,7 @@ namespace phiClustCore
             }
             if (structNames.Count == 0)
                 throw new Exception("No structures to cluster!");
-            input.projection = false;
+            input.projection = true;
             consensusProjection = true;
             if(input.projection)
                 dicC = PrepareKeys(structNames,true,true);
@@ -2304,7 +2304,10 @@ namespace phiClustCore
                 {
                     StringBuilder st = new StringBuilder();
                     for (int i = 0; i < data[structNames[j]].Count; i++)
-                        st.Append(data[structNames[j]][i]);
+                        if(data[structNames[j]][i]<0)
+                            st.Append(9+data[structNames[j]][i]);
+                        else
+                            st.Append(data[structNames[j]][i]);
                     if (dicC.ContainsKey(st.ToString()))
                         dicC[st.ToString()].Add(j);
                     else
