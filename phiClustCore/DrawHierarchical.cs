@@ -32,7 +32,7 @@ namespace phiClustCore
         public bool showLabels = false;
         public int labelSize = 5;
         public int sizeThreshold = 0;
-        public int clusterSize=0;
+        public int clusterSize = 0;
         double circleStep;
         public int posStart = 20;
         List<string> geneLabels = new List<string>();
@@ -40,10 +40,10 @@ namespace phiClustCore
         public int currentLabelIndex = -1;
         HClusterNode maxHDist;
         HClusterNode minHDist;
-        int minRealDist;
-        int maxRealDist;
+        public int minRealDist;
+        public int maxRealDist;
         string measureName;
-        public DrawHierarchical(HClusterNode hnode, string measureName, Dictionary<string, string> labels,Bitmap buffer,bool horizontalView)
+        public DrawHierarchical(HClusterNode hnode, string measureName, Dictionary<string, string> labels, Bitmap buffer, bool horizontalView)
         {
             this.hnode = this.rootNode = hnode;
             this.horizontalView = horizontalView;
@@ -56,27 +56,31 @@ namespace phiClustCore
             SetColors();
 
         }
-        public HClusterNode FindClosestNode(int x,int y)
+        public HClusterNode FindClosestNode(int x, int y)
         {
-            HClusterNode returnNode=null;
+            HClusterNode returnNode = null;
             int remDist = int.MaxValue;
-            Queue <HClusterNode> q=new Queue<HClusterNode>();
+            int dist = int.MaxValue;
+            Queue<HClusterNode> q = new Queue<HClusterNode>();
             q.Enqueue(rootNode);
             while (q.Count != 0)
             {
                 HClusterNode node = q.Dequeue();
-
-                int dist = (node.gNode.x - x) * (node.gNode.x - x)+(node.gNode.y - y) * (node.gNode.y - y);
-                if(dist<remDist && dist<100)
+                if (node.visible)
                 {
-                    remDist = dist;
-                    returnNode = node;
+                    if (node.gNode != null)
+                        dist = (node.gNode.x - x) * (node.gNode.x - x) + (node.gNode.y - y) * (node.gNode.y - y);
+
+                    if (dist < remDist && dist < 100)
+                    {
+                        remDist = dist;
+                        returnNode = node;
+                    }
+
                 }
-
-
                 if (node.joined == null)
                     continue;
-                foreach(var item in node.joined)
+                foreach (var item in node.joined)
                     q.Enqueue(item);
             }
 
@@ -84,11 +88,11 @@ namespace phiClustCore
         }
         public int GetChildrenNum(HClusterNode hNode)
         {
-            int counter=0;
+            int counter = 0;
             Stack<HClusterNode> st = new Stack<HClusterNode>();
             HClusterNode current = null;
             st.Push(hNode);
-            while(st.Count!=0)
+            while (st.Count != 0)
             {
                 current = st.Pop();
                 if (current.joined != null)
@@ -99,7 +103,7 @@ namespace phiClustCore
                 else
                     counter++;
 
-            }            
+            }
             return counter;
         }
         static public List<Color> PrepareColorMap()
@@ -143,7 +147,7 @@ namespace phiClustCore
         }
 
 
-        public void PrepareGraphNodes(Bitmap bmp)
+        public void PrepareGraphNodes(Bitmap bmp, double distanceThreshold = double.MaxValue)
         {
 
             circleStep = 40.0 / rootNode.setStruct.Count;
@@ -151,13 +155,13 @@ namespace phiClustCore
             rootNode.gNode = new GraphNode();
             rootNode.gNode.areaLeft = 20;
 
-            maxGraphicsY = bmp.Size.Height-20;// - posStart - 30;// -3 * posStart;
-            maxGraphicsX = bmp.Size.Width-20;// - posStart - 30;
+            maxGraphicsY = bmp.Size.Height - 20;// - posStart - 30;// -3 * posStart;
+            maxGraphicsX = bmp.Size.Width - 20;// - posStart - 30;
             if (maxDist == 0)
                 throw new Exception("Dendrogram cannot be build. Wrong distances!");
             distanceStepY = ((float)maxGraphicsY) / maxDist;
             distanceStepX = ((float)maxGraphicsX) / maxDist;
-             
+
             if (horizontalView)
             {
                 rootNode.gNode.areaRight = bmp.Size.Width - 20;
@@ -171,19 +175,123 @@ namespace phiClustCore
                 rootNode.gNode.x = maxGraphicsX - (int)(distanceStepX * rootNode.levelDist);// + posStart;
             }
             rootNode.gNode.refName = rootNode.refStructure;
-            
+
             //Console.WriteLine("node=" + rootNode.gNode.y + " ldist=" + rootNode.levelDist + " step=" + distanceStepY + " aa=" + distanceStepY * rootNode.levelDist);
             //maxX = hnode.gNode.areaRight;
 
             // FillGraphNodes(rootNode);
-            MakeGraphNodes(rootNode);
+            MakeGraphNodes(rootNode, distanceThreshold);
             RecalcPositions(rootNode);
-            if(horizontalView)
-                RecalcPositions(3, bmp.Width-3);
+            if (horizontalView)
+                RecalcPositionsN(3, bmp.Width - 3);
             else
-                RecalcPositions(3, bmp.Height-3);
+                RecalcPositionsN(3, bmp.Height - 3);
         }
+        void GetTreeStack(Stack<HClusterNode> stackNodes)
+        {
+            if (stackNodes.Count > 0)
+            {
+                HClusterNode node = stackNodes.Peek();
+                if (node.joined != null)
+                {
+                    foreach (var item in node.joined)
+                    {
+                        if (item.joined != null)
+                        {
+                            stackNodes.Push(item);
+                            GetTreeStack(stackNodes);
+                        }
+                    }
+                }
+            }
+        }
+        void RecalcPositionsN(int start, int stop)
+        {
+            List<HClusterNode> nodes = rootNode.GetLeaves();
+            HashSet<HClusterNode> hNodes = new HashSet<HClusterNode>();
+            int counter = 0;
+            for (int i = 0; i < nodes.Count; i++)
+                if (nodes[i].visible)
+                    counter += nodes[i].setStruct.Count;
 
+
+            //float step = ((float)(stop - start) )/ nodes.Count;
+            float step = ((float)(stop - start)) / (counter + 2);
+            if (horizontalView)
+            {
+
+                int pos = 1;
+                for (int i = 0; i < nodes.Count; i++)
+                {
+                    if (nodes[i].visible)
+                    {
+                        nodes[i].gNode.areaLeft = (int)(pos * step);
+                        pos += nodes[i].setStruct.Count;
+                        nodes[i].gNode.areaRight = (int)(pos * step);
+                        //nodes[i].gNode.x = (int)((step * pos) + start);
+                        nodes[i].gNode.x = nodes[i].gNode.areaLeft + (int)(nodes[i].gNode.areaRight - nodes[i].gNode.areaLeft) / 2;
+                    }
+                    if (nodes[i].gNode.x < 0)
+                        Console.WriteLine();
+                }
+            }
+            else
+            {
+                int pos = 1;
+                for (int i = 0; i < nodes.Count; i++)
+                {
+                    if (nodes[i].visible)
+                    {
+                        nodes[i].gNode.areaLeft = (int)(pos * step);
+                        pos += nodes[i].setStruct.Count;
+                        nodes[i].gNode.areaRight = (int)(pos * step);
+                        nodes[i].gNode.y = nodes[i].gNode.areaLeft + (int)(nodes[i].gNode.areaRight - nodes[i].gNode.areaLeft) / 2;
+                    }
+                    if (nodes[i].gNode.y < 0)
+                        Console.WriteLine();
+                }
+                
+            }
+            
+            Stack<HClusterNode> sNodes = new Stack<HClusterNode>();
+            sNodes.Push(rootNode);
+
+            GetTreeStack(sNodes);
+            while (sNodes.Count > 0)
+            {
+                var item = sNodes.Pop();
+
+                float sum = 0;
+                int count = 0;
+                foreach (var it in item.joined)
+                {
+                    if (it.visible)
+                    {
+                        if (horizontalView)
+                            sum += it.gNode.x;
+                        else
+                            sum += it.gNode.y;
+                        count++;
+                    }
+
+                }
+                if(count>0)
+                    sum /= count;
+                if (count == 0 && item.visible)
+                {
+                    item.visible = false;
+                    continue;
+                }
+                if (horizontalView)
+                    item.gNode.x = (int)sum;
+                else
+                    item.gNode.y = (int)sum;
+
+                if (item.gNode.y < 0 || item.gNode.x<0)
+                    Console.WriteLine();
+            }
+        }
+            
         void RecalcPositions(int start,int stop)
         {
             List<HClusterNode> nodes=rootNode.GetLeaves();
@@ -192,7 +300,8 @@ namespace phiClustCore
             List<HClusterNode> toAdd = new List<HClusterNode>();
             int counter = 0;
             for (int i = 0; i < nodes.Count; i++)
-                counter += nodes[i].setStruct.Count;
+                if(nodes[i].visible)
+                    counter += nodes[i].setStruct.Count;
 
 
             //float step = ((float)(stop - start) )/ nodes.Count;
@@ -203,11 +312,14 @@ namespace phiClustCore
                 int pos = 1;
                 for (int i = 0; i < nodes.Count; i++)
                 {
-                    nodes[i].gNode.areaLeft =(int)(pos*step);
-                    pos += nodes[i].setStruct.Count;
-                    nodes[i].gNode.areaRight= (int)(pos * step);
-                    //nodes[i].gNode.x = (int)((step * pos) + start);
-                        nodes[i].gNode.x = nodes[i].gNode.areaLeft+(int)(nodes[i].gNode.areaRight - nodes[i].gNode.areaLeft)/2;
+                    if (nodes[i].visible)
+                    {
+                        nodes[i].gNode.areaLeft = (int)(pos * step);
+                        pos += nodes[i].setStruct.Count;
+                        nodes[i].gNode.areaRight = (int)(pos * step);
+                        //nodes[i].gNode.x = (int)((step * pos) + start);
+                        nodes[i].gNode.x = nodes[i].gNode.areaLeft + (int)(nodes[i].gNode.areaRight - nodes[i].gNode.areaLeft) / 2;
+                    }
 
                 }
             }
@@ -216,21 +328,29 @@ namespace phiClustCore
                 int pos = 1;
                 for (int i = 0; i < nodes.Count; i++)
                 {
-                    nodes[i].gNode.areaLeft = (int)(pos * step);
-                    pos += nodes[i].setStruct.Count;
-                    nodes[i].gNode.areaRight = (int)(pos * step);
-                        nodes[i].gNode.y = nodes[i].gNode.areaLeft+(int)(nodes[i].gNode.areaRight - nodes[i].gNode.areaLeft) / 2;
+                    if (nodes[i].visible)
+                    {
+                        nodes[i].gNode.areaLeft = (int)(pos * step);
+                        pos += nodes[i].setStruct.Count;
+                        nodes[i].gNode.areaRight = (int)(pos * step);
+                        nodes[i].gNode.y = nodes[i].gNode.areaLeft + (int)(nodes[i].gNode.areaRight - nodes[i].gNode.areaLeft) / 2;
+                    }
                 }
 
             }
             foreach (var item in nodes)
             {
-                hNodes.Add(item);
+                if(item.visible)
+                    hNodes.Add(item);
             }
             while (hNodes.Count > 1)
             {
+                toAdd.Clear();
+                toRemove.Clear();
                 foreach (var item in hNodes)
                 {
+                    if (!item.visible)
+                        continue;
                     bool test = true;
                     if (item.parent != null)
                     {
@@ -262,7 +382,7 @@ namespace phiClustCore
                     }
                 }
                 foreach (var item in toAdd)
-                    hNodes.Add(item);
+                        hNodes.Add(item);
                 foreach (var item in toRemove)
                     hNodes.Remove(item);
             }
@@ -272,28 +392,38 @@ namespace phiClustCore
         {
             if (node.joined != null && node.joined.Count != 0)
             {
+                int joinedCount = 0;
                 foreach (var item in node.joined)
-                    RecalcPositions(item);
-
+                    if (item.visible)
+                    {
+                        RecalcPositions(item);
+                        joinedCount++;
+                    }
+                if (joinedCount == 0)
+                    return;
                 if (horizontalView)
                 {
                     node.gNode.x = 0;
                     foreach (var item in node.joined)
                     {
-                        node.gNode.x += item.gNode.x;
+                        if(item.visible)
+                            node.gNode.x += item.gNode.x;
                     }
-                    node.gNode.x /= node.joined.Count;
+                    node.gNode.x /= joinedCount;
                 }
                 else
                 {
                     node.gNode.y = 0;
                     foreach (var item in node.joined)
                     {
-                        node.gNode.y += item.gNode.y;
+                        if(item.visible)
+                            node.gNode.y += item.gNode.y;
                     }
-                    node.gNode.y /= node.joined.Count;
-
+                    node.gNode.y /= joinedCount;
+                    
                 }
+                if (node.gNode.x < 0 || node.gNode.y < 0)
+                    Console.WriteLine();
             }
 
 
@@ -341,7 +471,6 @@ namespace phiClustCore
             Graphics g;
             
             g = Graphics.FromImage(bmp);
-            g.Clear(Color.Transparent);
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
          //   maxGraphicsY = bmp.Size.Height;// -2 * posStart;
@@ -426,7 +555,7 @@ namespace phiClustCore
 
             gr.DrawString(measureName, drawFont, drawBrush, 5, 0);
         }
-
+        
         void DrawStack(Graphics gr, int SizeY, int SizeX,int lineThick, bool legend, Color linesColor)
         {
             HClusterNode aux;
@@ -438,33 +567,49 @@ namespace phiClustCore
                     aux.visible = false;
                     continue;
                 }
-                aux.visible = true;
+                if (!aux.visible)
+                    continue;
+                //aux.visible = true;
                 if (legend)
                     aux.gNode.DrawNode(gr, lineThick);
                 if (nodesStack.Count == 0)
                     continue;
                 Pen p;
                 if (linesColor == Color.Empty)
-                    p = new Pen(aux.color);
+                {
+                    if(aux.color!=Color.Black)
+                        p = new Pen(aux.color,2);
+                    else
+                        p = new Pen(aux.color, lineThick);
+                }
                 else
-                    p = new Pen(linesColor);
-                // p = new Pen(Color.Black);
-                p.Width = lineThick;
+                {
+                    p = new Pen(linesColor,1);
+                    // p = new Pen(Color.Black);
+                    p.Width = lineThick;
+                }
                 if (aux.parent != null)
                 {
                     if (horizontalView)
                     {
                         int x = aux.gNode.x;
-                        gr.DrawLine(p, x, aux.gNode.y, x, aux.parent.gNode.y - lineThick / 2);
-                        int y = aux.parent.gNode.y;
-                        gr.DrawLine(p, aux.gNode.x, y, aux.parent.gNode.x, y);
+                        if (aux.parent.visible && aux.visible && aux.gNode.x>=0)
+                        {
+                            gr.DrawLine(p, x, aux.gNode.y, x, aux.parent.gNode.y - lineThick / 2);
+                            int y = aux.parent.gNode.y;
+                            if(aux.parent.gNode.x>=0)
+                                gr.DrawLine(p, aux.gNode.x, y, aux.parent.gNode.x, y);
+                        }
                     }
                     else
                     {
                         int y = aux.gNode.y;
-                        gr.DrawLine(p, aux.gNode.x, y, aux.parent.gNode.x - lineThick / 2,y);
-                        int x = aux.parent.gNode.x;
-                        gr.DrawLine(p, x,aux.gNode.y, x, aux.parent.gNode.y);
+                        if (aux.parent.visible && y>=0 && aux.gNode.x>=0 && aux.parent.gNode.y>=0)
+                        {
+                            gr.DrawLine(p, aux.gNode.x, y, aux.parent.gNode.x - lineThick / 2, y);
+                            int x = aux.parent.gNode.x;
+                            gr.DrawLine(p, x, aux.gNode.y, x, aux.parent.gNode.y);
+                        }
                     }
                     //Console.WriteLine("x=" + x + " y=" + aux.gNode.y + " x=" + x + " y=" + (aux.parent.gNode.y - lineThick / 2));
                 }
@@ -479,22 +624,23 @@ namespace phiClustCore
 
 
                         }
-                    if (aux.setStruct.Count > 1)
+                    if (aux.setStruct.Count > 1 && aux.visible)
                     {
                         Rectangle rect;
                         if (horizontalView)
                         {
-                            rect = new Rectangle(aux.gNode.x - 2, aux.gNode.y, 5, 5);
-                            gr.DrawLine(p,  aux.gNode.areaLeft, aux.gNode.y, aux.gNode.areaRight, aux.gNode.y);
-                            gr.DrawLine(p,  aux.gNode.areaLeft, aux.gNode.y,  aux.gNode.areaLeft, aux.gNode.y+5);
-                            gr.DrawLine(p,  aux.gNode.areaRight, aux.gNode.y,  aux.gNode.areaRight,aux.gNode.y + 5);
+                                rect = new Rectangle(aux.gNode.x - 2, aux.gNode.y, 5, 5);
+                                gr.DrawLine(p, aux.gNode.areaLeft, aux.gNode.y, aux.gNode.areaRight, aux.gNode.y);
+                                gr.DrawLine(p, aux.gNode.areaLeft, aux.gNode.y, aux.gNode.areaLeft, aux.gNode.y + 5);
+                                gr.DrawLine(p, aux.gNode.areaRight, aux.gNode.y, aux.gNode.areaRight, aux.gNode.y + 5);
                         }
                         else
                         {
-                            rect = new Rectangle(aux.gNode.x, aux.gNode.y - 2, 5, 5);
-                            gr.DrawLine(p, aux.gNode.x, aux.gNode.areaLeft, aux.gNode.x, aux.gNode.areaRight);
-                            gr.DrawLine(p, aux.gNode.x, aux.gNode.areaLeft, aux.gNode.x+5,  aux.gNode.areaLeft);
-                            gr.DrawLine(p, aux.gNode.x, aux.gNode.areaRight,aux.gNode.x+5, aux.gNode.areaRight);
+
+                                rect = new Rectangle(aux.gNode.x, aux.gNode.y - 2, 5, 5);
+                                gr.DrawLine(p, aux.gNode.x, aux.gNode.areaLeft, aux.gNode.x, aux.gNode.areaRight);
+                                gr.DrawLine(p, aux.gNode.x, aux.gNode.areaLeft, aux.gNode.x + 5, aux.gNode.areaLeft);
+                                gr.DrawLine(p, aux.gNode.x, aux.gNode.areaRight, aux.gNode.x + 5, aux.gNode.areaRight);
                         }
                         Color c;
                         if (clusterSize == 0)
@@ -592,22 +738,25 @@ namespace phiClustCore
                 {
                     for (int i = 0; i < aux.joined.Count; i++)
                     {
-                        if (horizontalView)
+                        if (aux.joined[i].visible)
                         {
-                            if (aux.joined[i].gNode.y < minHDist.gNode.y)
-                                minHDist = aux.joined[i];
-                            if (aux.joined[i].gNode.y > maxHDist.gNode.y)
-                                maxHDist = aux.joined[i];
-                        }
-                        else
-                        {
-                            if (aux.joined[i].gNode.x < minHDist.gNode.x)
-                                minHDist = aux.joined[i];
-                            if (aux.joined[i].gNode.x > maxHDist.gNode.x)
-                                maxHDist = aux.joined[i];
+                            if (horizontalView)
+                            {
+                                if (aux.joined[i].gNode.y < minHDist.gNode.y)
+                                    minHDist = aux.joined[i];
+                                if (aux.joined[i].gNode.y > maxHDist.gNode.y)
+                                    maxHDist = aux.joined[i];
+                            }
+                            else
+                            {
+                                if (aux.joined[i].gNode.x < minHDist.gNode.x)
+                                    minHDist = aux.joined[i];
+                                if (aux.joined[i].gNode.x > maxHDist.gNode.x)
+                                    maxHDist = aux.joined[i];
 
+                            }
                         }
-                        aux.joined[i].parent = aux;
+                        aux.joined[i].parent = aux;                        
                         localStack.Push(aux.joined[i]);
                         nodesStack.Push(aux.joined[i]);
                     }
@@ -642,64 +791,129 @@ namespace phiClustCore
 
             return null;
         }
-
-
-        private void MakeGraphNodes(HClusterNode localNode)
+        public void MakeAllVisible()
         {
             Queue<HClusterNode> q = new Queue<HClusterNode>();
+            List<HClusterNode> leafs = new List<HClusterNode>();
+            q.Enqueue(rootNode);
+            while (q.Count != 0)
+            {
+                HClusterNode node = q.Dequeue();
+                if (node.joined == null)
+                    continue;
 
+                foreach (var item in node.joined)
+                        item.visible = true;
+
+                for (int i = 0; i < node.joined.Count; i++)
+                        q.Enqueue(node.joined[i]);
+            }
+
+        }
+        public void MakeGraphInvisible(HClusterNode localNode,double distanceThreshold)
+        {
+            Queue<HClusterNode> q = new Queue<HClusterNode>();
+            List<HClusterNode> leafs = new List<HClusterNode>();
             q.Enqueue(localNode);
             while (q.Count != 0)
             {
                 HClusterNode node = q.Dequeue();
                 if (node.joined == null)
                     continue;
-                List<int> rangeTab = new List<int>();
-                int sum = 0;
+
                 foreach (var item in node.joined)
+                    if (item.realDist > distanceThreshold)
+                        item.visible = false;
+                    else
+                        if (node.realDist > distanceThreshold && item.joined == null)
+                            item.visible = false;
+                        else
+                            item.visible = true;
+
+                for (int i = 0; i < node.joined.Count; i++)
+                        q.Enqueue(node.joined[i]);
+            }
+
+        }
+        private void MakeGraphNodes(HClusterNode localNode,double distanceThreshold)
+        {
+            Queue<HClusterNode> q = new Queue<HClusterNode>();
+
+            //MakeAllVisible();
+            //MakeGraphInvisible(localNode, distanceThreshold);
+            
+            q.Enqueue(localNode);
+            while (q.Count != 0)
+            {
+                HClusterNode node = q.Dequeue();
+                if (node.joined == null)
+                    continue;
+              //  List<int> rangeTab = new List<int>();
+                double sum = 0;
+                int joinedNum = 0;
+
+              
+
+                    foreach (var item in node.joined)
+                {
                     // sum += item.setStruct.Count;
-                    sum += GetChildrenNum(item);
+                    if (item.visible)
+                    {
+                        sum += item.setStruct.Count;
+                        //sum += GetChildrenNum(item);
+                        joinedNum++;
+                    }
+                }
 
                 int diffArea = node.gNode.areaRight - node.gNode.areaLeft;
-                for (int i = 0; i < node.joined.Count; i++)
-                {
-                    if (viewType)
-                        rangeTab.Add(diffArea / node.joined.Count);
-                    else
-                        //rangeTab.Add(diffArea *  node.joined[i].setStruct.Count / sum);
-                        rangeTab.Add(diffArea * GetChildrenNum(node.joined[i]) / sum);
-                }
-                for (int i = 0; i < node.joined.Count; i++)
+                List<HClusterNode> auxNodes = new List<HClusterNode>();
+                IEnumerable<HClusterNode> joinedSorted = node.joined.OrderBy(x=>x.setStruct.Count);
+                foreach(var nodeJ in joinedSorted)
                 {
                     GraphNode graph;
-                    node.joined[i].gNode = new GraphNode();
-                    graph = node.joined[i].gNode;
-                    graph.refName = node.joined[i].refStructure;
-                    if (i == 0)
+
+                    if (!nodeJ.visible)
+                        continue;
+
+                    
+
+                    int range=0;
+                    if (viewType)
+                        range=diffArea / joinedNum;
+                    else
+                        //rangeTab.Add(diffArea *  node.joined[i].setStruct.Count / sum);
+                        //range=(int)(diffArea * GetChildrenNum(node.joined[i]) / sum);
+                        range = (int)(diffArea * nodeJ.setStruct.Count / sum);
+
+
+                    nodeJ.gNode = new GraphNode();
+                    graph = nodeJ.gNode;
+                    graph.refName = nodeJ.refStructure;
+                    if (auxNodes.Count == 0)
                         graph.areaLeft = node.gNode.areaLeft;
                     else
-                        graph.areaLeft = node.joined[i - 1].gNode.areaRight;
+                        graph.areaLeft = auxNodes[auxNodes.Count-1].gNode.areaRight;
 
-                    graph.areaRight = graph.areaLeft + rangeTab[i];
+                    graph.areaRight = graph.areaLeft + range;
+
+                    auxNodes.Add(nodeJ);
+
                     //if (localNode.joined[i].levelDist >0)
                     if (horizontalView)
                     {
-                        graph.y = maxGraphicsY - (int)(distanceStepY * node.joined[i].levelDist);// + posStart;
+                        graph.y = maxGraphicsY - (int)(distanceStepY * nodeJ.levelDist);// + posStart;
                         graph.x = (graph.areaRight + graph.areaLeft) / 2;
                     }
                     else
                     {
                         graph.y = maxGraphicsY - (graph.areaRight + graph.areaLeft) / 2;// +posStart+50;
-                        graph.x = maxGraphicsX - (int)(distanceStepX * node.joined[i].levelDist);// + posStart;
+                        graph.x = maxGraphicsX - (int)(distanceStepX * nodeJ.levelDist);// + posStart;
                     }
-                    //else
-                    //  graph.y = maxGraphicsY - 30;
+                    if (graph.y < 0 || graph.x < 0)
+                        Console.WriteLine();
 
-
-
-
-                    if (node.joined.Count > 0)
-                        q.Enqueue(node.joined[i]);
+                    if (node.joined.Count > 0/* && node.joined[i].visible*/)
+                        q.Enqueue(nodeJ);
                 }
             }
         }

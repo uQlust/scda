@@ -29,24 +29,41 @@ namespace Graph
             DialogResult res=openFileDialog1.ShowDialog();
             if (res == DialogResult.OK)
             {
-                
-                DataForm file = new DataForm(openFileDialog1.FileName);
-                res=file.ShowDialog();
-                if (res == DialogResult.OK)
+                if (checkBox1.Checked)
                 {
-                    
                     groupBox1.Enabled = true;
-                    groupBox2.Enabled = true;                    
+                    groupBox2.Enabled = true;
 
                     omicsFiles.SelectedIndex = omicsFiles.Items.Count - 1;
                     button9.Enabled = true;
-                    foreach (var item in openFileDialog1.FileNames)
-                        if (checkBox1.Checked)
-                        //omicsFiles.Items.Add(file.GetOmicsFile(item));
-                        omicsFiles.Items.Add(file.GetOmicsSpareFile(item));
-                        else
-                            omicsFiles.Items.Add(file.GetOmicsFile(item));
 
+
+                    foreach (var item in openFileDialog1.FileNames)
+                        omicsFiles.Items.Add(ReadOmicsFile.GetOmicsSpareFile(item));
+                }
+                else
+                {
+                    using (DataForm file = new DataForm(openFileDialog1.FileName))
+                    {
+                        res = file.ShowDialog();
+                        if (res == DialogResult.OK)
+                        {
+
+                            groupBox1.Enabled = true;
+                            groupBox2.Enabled = true;
+
+                            omicsFiles.SelectedIndex = omicsFiles.Items.Count - 1;
+                            button9.Enabled = true;
+
+                            ReadOmicsFile omicsFile = new ReadOmicsFile(file.setup);
+                            foreach (var item in openFileDialog1.FileNames)
+                            {
+                                //omicsFiles.Items.Add(file.GetOmicsFile(item));
+                                omicsFiles.Items.Add(omicsFile.GetOmicsFile(item));
+                            }
+
+                        }
+                    }
                 }
 
             }

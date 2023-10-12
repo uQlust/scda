@@ -60,6 +60,7 @@
     <Compile Include="Distance\FastDiscreteDist.cs" />
     <Compile Include="FastRPart.cs" />
     <Compile Include="FiltersOmics.cs" />
+    <Compile Include="HeatmapDrawCore.cs" />
     <Compile Include="hierarchicalFast.cs" />
     <Compile Include="OmicsDataSet.cs" />
     <Compile Include="DebugClass.cs" />

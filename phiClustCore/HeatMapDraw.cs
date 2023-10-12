@@ -9,8 +9,24 @@ using System.IO;
 
 namespace phiClustCore
 {
+   
+
     public class HeatMapDraw
     {
+        struct TsTuple
+        {
+            public Color c;
+            public double stepX;
+            public double stepY;
+
+            public TsTuple(Color c, double stepX, double stepY)
+            {
+                this.c = c;
+                this.stepX = stepX;
+                this.stepY = stepY;
+            }
+
+        }
         String Name;
         OmicsDataSet data;
         public List<int> indexLabels;
@@ -19,7 +35,8 @@ namespace phiClustCore
         public DrawHierarchical upper;
         public DrawHierarchical left;
         public Bitmap upperBitMap;
-        public Bitmap leftBitMap;        
+        public Bitmap leftBitMap;
+        object lockVar = new object();
         Bitmap legendBitMap;
         public Bitmap heatMap;
         Bitmap bitAll;
@@ -29,6 +46,14 @@ namespace phiClustCore
         Dictionary<string,List<string>> clustersUpper;
         Dictionary<string, List<string>> clustersLeft;
         Dictionary<string, string> labels;
+        List<HClusterNode> upperLeavesOrgOrdered=null;
+        List<HClusterNode> leftLeavesOrgOrdered=null;
+
+        List<TsTuple>[,] colors = null;
+
+        Dictionary<string, int> geneIndex = new Dictionary<string, int>();
+        Dictionary<string, int> sampleIndex = new Dictionary<string, int>();
+
 
         double[,] dataToDraw = null;
         public HeatMapDraw(Bitmap upper, Bitmap left,Bitmap heat,Bitmap legend,HClusterNode upperNode, HClusterNode leftNode, Dictionary<string, string> labels, ClusterOutput outp)
@@ -50,17 +75,28 @@ namespace phiClustCore
             }
             foreach (var item in outp.ClustersLeft.list)
             {
-                clustersLeft.Add(item[0], new List<string>());
-                for (int i = 1; i < item.Count; i++)
-                    clustersLeft[item[0]].Add(item[i]);
+                if (item.Count>0 && !clustersLeft.ContainsKey(item[0]))
+                {
+                    clustersLeft.Add(item[0], new List<string>());
+                    for (int i = 1; i < item.Count; i++)
+                        clustersLeft[item[0]].Add(item[i]);
+                }
             }
             
             this.outp = outp;
             this.bitAll = new Bitmap(left.Width+upper.Width,upper.Height+left.Height);
             this.upperNode = auxUpper = upperNode;
             this.leftNode = auxLeft = leftNode;
-            this.labels = labels;
             data = outp.data;
+            this.labels = labels;
+            PrepareDataForHeatMap();
+            PrepareDataColorMap();            
+           
+
+        }
+
+        void PrepareDataColorMap()
+        {
             if (outp.data.intervals?.Count > 0)
             {
                 List<int> counterM = new List<int>();
@@ -68,7 +104,7 @@ namespace phiClustCore
                 int[] codes = new int[outp.data.codes.Count];
                 profilesColorMap = new Dictionary<double, Color>();
                 int i = 0;
-                foreach(var item in outp.data.codes)
+                foreach (var item in outp.data.codes)
                 {
                     codes[i] = item;
                     if (codes[i] < 0)
@@ -79,7 +115,7 @@ namespace phiClustCore
                         counterP.Add(codes[i]);
                     i++;
                 }
-                if(counterM.Count==0)
+                if (counterM.Count == 0)
                 {
                     counterP.Add(0);
                     profilesColorMap.Clear();
@@ -94,7 +130,7 @@ namespace phiClustCore
                             counterP.Add(aux[i]);
 
                 }
-                
+
                 if (counterM.Count > 0)
                 {
                     int[] aux = counterM.ToArray();
@@ -103,7 +139,7 @@ namespace phiClustCore
 
                     double st = 255.0 / aux.Length;
                     for (i = 0; i < aux.Length; i++)
-                        profilesColorMap.Add(aux[aux.Length-1-i], Color.FromArgb(0, 0, (int)(st * (i + 1))));
+                        profilesColorMap.Add(aux[aux.Length - 1 - i], Color.FromArgb(0, 0, (int)(st * (i + 1))));
                 }
                 if (counterP.Count > 0)
                 {
@@ -117,6 +153,8 @@ namespace phiClustCore
             }
             else
                 throw new Exception("Descrete states are not defined");
+
+
         }
         public void ChangeBitmpSizes(int widthLeft,int heightLeft,int widthUpper,int heightUpper)
         {
@@ -135,17 +173,20 @@ namespace phiClustCore
             heatMap = new Bitmap(9 * bit.Width / 10, 9 * bit.Height / 10);
             
             this.outp = outp;
+            data = outp.data;
             this.bitAll = bit;
             this.upperNode = auxUpper = upperNode;
             this.leftNode = auxLeft = leftNode;
             this.labels = labels;
 
+            PrepareDataForHeatMap();
+            PrepareDataColorMap();
         }
         public void PrepareDataForHeatMap()
         {
             this.Name = "HeatMap ";
-            upper = new DrawHierarchical(upperNode, outp.measure, labels, upperBitMap, true);
-            left = new DrawHierarchical(leftNode, outp.measure, labels, leftBitMap, false);
+            upper = new DrawHierarchical(upperNode, outp.measure, labels, new Bitmap(10000, 300), true);
+            left = new DrawHierarchical(leftNode, outp.measure, labels, new Bitmap(300, 10000), false);
 
             List<HClusterNode> upperLeaves = auxUpper.GetLeaves();
             List<HClusterNode> leftLeaves = auxLeft.GetLeaves();
@@ -153,6 +194,26 @@ namespace phiClustCore
             upperLeaves = upperLeaves.OrderByDescending(o => o.gNode.x).Reverse().ToList();
             leftLeaves = leftLeaves.OrderByDescending(o => o.gNode.y).Reverse().ToList();
 
+            if (upperLeavesOrgOrdered == null)
+            {
+                upperLeavesOrgOrdered = new List<HClusterNode>(upperLeaves);
+                leftLeavesOrgOrdered = new List<HClusterNode>(leftLeaves);
+            }
+            upper = new DrawHierarchical(upperNode, outp.measure, labels, upperBitMap, true);
+            left = new DrawHierarchical(leftNode, outp.measure, labels, leftBitMap, false);
+
+            upperLeaves = auxUpper.GetLeaves();
+            leftLeaves = auxLeft.GetLeaves();
+
+            if (data != null)
+            {
+                if(geneIndex.Count==0)
+                    for (int i = 0; i < data.geneLabels.Count; i++)                   
+                        geneIndex.Add(data.geneLabels[i], i);
+                if(sampleIndex.Count==0)
+                    for (int i = 0; i < data.sampleLabels.Count; i++)
+                        sampleIndex.Add(data.sampleLabels[i], i);
+            }
             BarColors();
         }
         void BarColors()
@@ -221,24 +282,15 @@ namespace phiClustCore
             SolidBrush b = new SolidBrush(Color.Black);
             double yPos1, yPos2;
 
-            Dictionary<string, int> geneIndex = new Dictionary<string, int>();
-            for (int i = 0; i < data.geneLabels.Count; i++)
-                geneIndex.Add(data.geneLabels[i], i);
-
-            Dictionary<string, int> sampleIndex = new Dictionary<string, int>();
-            for (int i = 0; i < data.sampleLabels.Count; i++)
-                sampleIndex.Add(data.sampleLabels[i], i);
-
-
             double yPos1Ref = 0;
             double yPos2Ref = 0;
             for (int i = 0; i < leftLeaves.Count; i++)
             {
-                yPos1Ref = leftLeaves[i].gNode.areaLeft;
-                yPos2Ref = leftLeaves[i].gNode.areaRight;
+                yPos1Ref = leftItem.gNode.areaLeft;
+                yPos2Ref = leftItem.gNode.areaRight;
                 //                double stepY=(yPos2Ref- yPos1Ref)/ leftLeaves[i].setStruct.Count;
-                double stepY = (double)(leftLeaves[i].gNode.areaRight - leftLeaves[i].gNode.areaLeft) / leftLeaves[i].setStruct.Count;
-                for (int k = 0; k < leftLeaves[i].setStruct.Count; k++)
+                double stepY = (double)(leftItem.gNode.areaRight - leftItem.gNode.areaLeft) / leftItem.setStruct.Count;
+                for (int k = 0; k < leftItem.setStruct.Count; k++)
                 {
                     yPos1=yPos1Ref+k*stepY;
                     yPos2=yPos1Ref+(k+1)*stepY;
@@ -259,7 +311,7 @@ namespace phiClustCore
                             xPos1 = xPos1Ref + stepX * n;
                             xPos2 = xPos2Ref + stepX * (n + 1);
 
-                            double ind = data.data[sampleIndex[leftLeaves[i].setStruct[k]], geneIndex[upperLeaves[j].setStruct[n]]];
+                            double ind = data.data[sampleIndex[leftItem.setStruct[k]], geneIndex[upperLeaves[j].setStruct[n]]];
                             Color c = profilesColorMap[ind];
                             b.Color = c;
                             if (yPos2 - yPos1 > 0)                        
@@ -271,99 +323,192 @@ namespace phiClustCore
             }
 
         }
-        public void DrawHeatMapN()
+        public double KLIndex(HClusterNode leftNode,HClusterNode upperNode)
         {
-            Graphics g = Graphics.FromImage(heatMap);
+            double res = 0;
+            Dictionary<double, double> freq = new Dictionary<double, double>();
+            foreach(var item in leftNode.setStruct)
+            {
+                double val = data.data[sampleIndex[item], geneIndex[upperNode.setStruct[0]]];
+                if (val != 0)
+                {
+                    if (freq.ContainsKey(val))
+                        freq[val]++;
+                    else
+                        freq.Add(val, 1);
+                }
+            }
+            double sum = 0;
+            List<double> keys = new List<double>(freq.Keys);
+            res = 0;
+            foreach (var item in keys)
+            {
+                freq[item] /= leftNode.setStruct.Count;
+                if (freq[item] > res)
+                    res = freq[item];
+            }
+            
+            return res;
+        }
+        void CreateColorArray(int s,int e)
+        {
             List<HClusterNode> upperLeaves = auxUpper.GetLeaves();
             List<HClusterNode> leftLeaves = auxLeft.GetLeaves();
+
+            double yPos;
+            for (int i = s; i < e; i++)
+            {
+                HClusterNode nodeL = leftLeaves[i];
+                yPos = nodeL.gNode.areaLeft;
+
+                double stepY = (double)(nodeL.gNode.areaRange) / nodeL.setStruct.Count;
+                for (int k = 0; k < nodeL.setStruct.Count; k++)
+                {                    
+                    double xPos;
+                    int sIndex = sampleIndex[nodeL.setStruct[k]];
+                    for (int j = 0; j < upperLeaves.Count; j++)
+                    {
+                        HClusterNode nodeU = upperLeaves[j];
+                        xPos = nodeU.gNode.areaLeft;
+                        double stepX = (double)(nodeU.gNode.areaRange) / nodeU.setStruct.Count;
+                                                
+                        for (int n = 0; n < nodeU.setStruct.Count; n++)
+                        {                            
+                            double ind = data.data[sIndex, geneIndex[nodeU.setStruct[n]]];
+                            if (!profilesColorMap.ContainsKey(ind))
+                                throw new Exception("Value " + ind + " do not exist in profilesColorMap");
+                            Color c = profilesColorMap[ind];
+                            lock (lockVar)
+                            {
+                                colors[(int)xPos, (int)yPos].Add(new TsTuple(c, stepX, stepY));
+                            }
+                            xPos += stepX;
+                        }
+                    }
+                    yPos += stepY;
+                }
+            }
+
+        }
+        void PaintColorArray(int s,int e,Graphics g)
+        {
+            SolidBrush b = new SolidBrush(Color.Black);
+            Dictionary<Color, int> freq = new Dictionary<Color, int>(30);
+            for (int i = s; i < e; i++)
+                for (int j = 0; j < colors.GetLength(1); j++)
+                {
+                    lock (lockVar)
+                    {
+                        List<TsTuple> c = colors[i, j];
+                        if (c.Count == 0)
+                            continue;
+
+                        freq.Clear();
+                        for (int n = 0; n < c.Count; n++)
+                        {
+                            Color aux = c[n].c;
+                            if (!freq.ContainsKey(aux))
+                                freq[aux] = 0;
+                            freq[aux]++;
+                        }
+                        if (freq.Count > 0)
+                        {
+                            KeyValuePair<Color, int> gkeyPair = freq.FirstOrDefault(MaxGuid => MaxGuid.Value == freq.Values.Max());
+                            double colorBrihtness = 0;
+                            foreach (var am in freq)
+                                colorBrihtness += am.Value;
+
+                            colorBrihtness = gkeyPair.Value / colorBrihtness;
+
+                            float h = 1;
+                            if (c[0].stepY > 1)
+                                h = (float)c[0].stepY;
+
+                            b.Color = gkeyPair.Key;
+                            colorBrihtness = 1 - colorBrihtness;
+                            int re = b.Color.R - System.Convert.ToInt32(colorBrihtness * b.Color.R);
+                            int gr = b.Color.G - System.Convert.ToInt32(colorBrihtness * b.Color.G);
+                            int bl = b.Color.B - System.Convert.ToInt32(colorBrihtness * b.Color.B);
+                            b.Color = Color.FromArgb(re, gr, bl);
+
+                            g.FillRectangle(b, i, j, (float)c[0].stepX, h);
+
+                        }
+                    }
+                }
+
+        }
+        public void DrawHeatMapN(Bitmap bit)
+        {
+            Graphics g = Graphics.FromImage(bit);
+            List<HClusterNode> upperLeaves = auxUpper.GetLeaves();
+            List<HClusterNode> leftLeaves = auxLeft.GetLeaves();
+            
 
             upperLeaves = upperLeaves.OrderByDescending(o => o.gNode.x).Reverse().ToList();
             leftLeaves = leftLeaves.OrderByDescending(o => o.gNode.y).Reverse().ToList();
             SolidBrush b = new SolidBrush(Color.Black);
-            double yPos1, yPos2;
-            List<Tuple<Color,float,float>>[,] colors = new List<Tuple<Color, float, float>>[heatMap.Width,heatMap.Height];
-            for (int i = 0; i < colors.GetLength(0); i++)
-                for (int j = 0; j < colors.GetLength(1); j++)
-                    colors[i, j] = new List<Tuple<Color, float, float>>();
+            double yPos1;
 
-            Dictionary<string, int> geneIndex = new Dictionary<string, int>();
-            for (int i = 0; i < data.geneLabels.Count; i++)
-                geneIndex.Add(data.geneLabels[i], i);
-
-            Dictionary<string, int> sampleIndex = new Dictionary<string, int>();
-            for (int i = 0; i < data.sampleLabels.Count; i++)
-                sampleIndex.Add(data.sampleLabels[i], i);
-
-            int ccc = 0;
-            double yPos1Ref = 0;
-            double yPos2Ref = 0;
-            for (int i = 0; i < leftLeaves.Count; i++)
+            if (colors == null || colors.GetLength(0) != bit.Width || colors.GetLength(1) != bit.Height)
             {
-                yPos1Ref = leftLeaves[i].gNode.areaLeft;
-                yPos2Ref = leftLeaves[i].gNode.areaRight;
-                //                double stepY=(yPos2Ref- yPos1Ref)/ leftLeaves[i].setStruct.Count;
-                double stepY = (double)(leftLeaves[i].gNode.areaRight - leftLeaves[i].gNode.areaLeft) / leftLeaves[i].setStruct.Count;
-                for (int k = 0; k < leftLeaves[i].setStruct.Count; k++)
+                colors = new List<TsTuple>[bit.Width, bit.Height];
+                for (int i = 0; i < colors.GetLength(0); i++)
+                    for (int j = 0; j < colors.GetLength(1); j++)
+                        colors[i, j] = new List<TsTuple>(3);
+            }
+            else
+                for (int i = 0; i < colors.GetLength(0); i++)
+                    for (int j = 0; j < colors.GetLength(1); j++)
+                        colors[i, j].Clear();
+
+            CreateColorArray(0, leftLeaves.Count);
+
+            PaintColorArray(0, colors.GetLength(0), g);
+            if (upperLeaves.Count!=upperLeavesOrgOrdered.Count)
+            {
+                List<HClusterNode> upperL = upperLeaves.OrderByDescending(o => o.gNode.y).ToList();
+                for (int i = 0; i < upperL.Count - 1; i++)
                 {
-                    yPos1 = yPos1Ref + k * stepY;
-                    yPos2 = yPos1Ref + (k + 1) * stepY;
+                    int indexStart = upperLeavesOrgOrdered.IndexOf(upperL[i]);
+                    int indexEnd = upperLeavesOrgOrdered.IndexOf(upperL[i + 1]);
 
-                    double xPos1, xPos2;
-                    double xPos1Ref, xPos2Ref;
-                    for (int j = 0; j < upperLeaves.Count; j++)
+                    if (indexEnd - indexStart > 1)
                     {
-                        xPos1Ref = upperLeaves[j].gNode.areaLeft;
-                        xPos2Ref = upperLeaves[j].gNode.areaRight;
-                        //if ((xPos2Ref - xPos1Ref) == 0)
-                        //    continue;
+                        b.Color = Color.White;
+                        int w = upperL[i].gNode.x + upperL[i].gNode.areaRange / 2;
+                        g.FillRectangle(b, w - 2, 0, 2, leftLeaves[leftLeaves.Count-1].gNode.areaRight);
 
-                        //double stepX = (xPos2Ref - xPos1Ref) / upperLeaves[j].setStruct.Count;
-                        double stepX = (double)(upperLeaves[j].gNode.areaRight - upperLeaves[j].gNode.areaLeft) / upperLeaves[j].setStruct.Count;
-                        for (int n = 0; n < upperLeaves[j].setStruct.Count; n++)
-                        {
-                            xPos1 = xPos1Ref + stepX * n;
-                            xPos2 = xPos2Ref + stepX * (n + 1);
-
-                            double ind = data.data[sampleIndex[leftLeaves[i].setStruct[k]], geneIndex[upperLeaves[j].setStruct[n]]];
-                            Color c = profilesColorMap[ind];
-                            b.Color = c;
-                            //if (yPos2 - yPos1 > 0)
-                            {
-                                colors[(int)xPos1, (int)yPos1].Add(new Tuple<Color, float, float>(c, (float)stepX, (float)stepY));
-                                ccc++;
-                            }
-                        }
                     }
+
                 }
             }
-            int xxx = 0;
-            for(int i=0;i<colors.GetLength(0);i++)
-                for(int j=0;j<colors.GetLength(1);j++)
+            if (leftLeaves.Count != leftLeavesOrgOrdered.Count)
+            {
+                List<HClusterNode> leftL = leftLeaves.OrderByDescending(o => o.gNode.y).Reverse().ToList();
+                Pen p = new Pen(Color.White, 2);
+                for (int i = 0; i < leftL.Count - 1; i++)
                 {
-                    Dictionary<Color, int> freq = new Dictionary<Color, int>();
-                    for (int n = 0; n < colors[i, j].Count; n++)
+                    int indexStart = leftLeavesOrgOrdered.IndexOf(leftL[i]);
+                    int indexEnd = leftLeavesOrgOrdered.IndexOf(leftL[i + 1]);
+                    //Check if up visibilit is false
+                    //bool test = false;
+                   /* foreach(var item in leftL[i].parent.joined)
                     {
-                        if (!freq.ContainsKey(colors[i, j][n].Item1))
-                            freq[colors[i, j][n].Item1] = 0;
+                        if (!item.visible)
+                            test = true;
 
-                        freq[colors[i, j][n].Item1]++;
-                    } 
-                   List<KeyValuePair<Color, int>> mappings = freq.ToList();
-                    if (mappings.Count > 0)
+                    }*/
+                    if (indexEnd - indexStart > 1 /*&& test*/)
                     {
-                        xxx = 0;
-                        foreach (var item in mappings)
-                            xxx += item.Value;
-                        if (xxx > 20)
-                            Console.Write("");
-                        mappings.Sort((x, y) => x.Value.CompareTo(y.Value));
-                        float h = 1;
-                        if (colors[i, j][0].Item3 > 1)
-                            h = colors[i, j][0].Item3;
-                        b.Color = mappings[mappings.Count-1].Key;
-                        g.FillRectangle(b, i, j, colors[i,j][0].Item2, h);
+                        int w = leftL[i].gNode.y + leftL[i].gNode.areaRange / 2;
+                        g.DrawLine(p, 0, w - 2, bit.Width, 2);
+                        //g.FillRectangle(b, 0, w - 2, bit.Width, 2);
                     }
+
+
                 }
+            }
 
         }
 
@@ -421,7 +566,7 @@ namespace phiClustCore
 
         private void PaintHeatMap()
         {            
-            DrawHeatMap();
+            DrawHeatMapN(heatMap);
         }
         public void SavePaint(string fileName)
         {

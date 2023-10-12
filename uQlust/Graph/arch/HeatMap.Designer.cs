@@ -52,7 +52,13 @@
             this.vScrollBar1 = new System.Windows.Forms.VScrollBar();
             this.label3 = new System.Windows.Forms.Label();
             this.menuStrip1 = new System.Windows.Forms.MenuStrip();
-            this.toolToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.splitContainer1 = new System.Windows.Forms.SplitContainer();
+            this.pictureBox6 = new System.Windows.Forms.PictureBox();
+            this.pictureBoxHeatMap = new System.Windows.Forms.PictureBox();
+            this.openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
+            this.pictureBox7 = new System.Windows.Forms.PictureBox();
+            this.checkBox1 = new System.Windows.Forms.CheckBox();
+            this.textBox1 = new System.Windows.Forms.TextBox();
             this.interactiveLabelColumn = new System.Windows.Forms.ToolStripMenuItem();
             this.interactiveLabelRow = new System.Windows.Forms.ToolStripMenuItem();
             this.rowClusterFileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -63,13 +69,7 @@
             this.backToHistogramToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.noteGenesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.saveToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.splitContainer1 = new System.Windows.Forms.SplitContainer();
-            this.pictureBox6 = new System.Windows.Forms.PictureBox();
-            this.pictureBoxHeatMap = new System.Windows.Forms.PictureBox();
-            this.openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
-            this.pictureBox7 = new System.Windows.Forms.PictureBox();
-            this.checkBox1 = new System.Windows.Forms.CheckBox();
-            this.textBox1 = new System.Windows.Forms.TextBox();
+            this.toolToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBoxUpper)).BeginInit();
@@ -316,94 +316,6 @@
             this.menuStrip1.TabIndex = 12;
             this.menuStrip1.Text = "menuStrip1";
             // 
-            // toolToolStripMenuItem
-            // 
-            this.toolToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.interactiveLabelColumn,
-            this.interactiveLabelRow,
-            this.rowClusterFileToolStripMenuItem,
-            this.selectGenesToolStripMenuItem,
-            this.histogramsToolStripMenuItem,
-            this.kruskalToolStripMenuItem,
-            this.minClusterDistanceToolStripMenuItem,
-            this.backToHistogramToolStripMenuItem,
-            this.noteGenesToolStripMenuItem,
-            this.saveToolStripMenuItem});
-            this.toolToolStripMenuItem.Name = "toolToolStripMenuItem";
-            this.toolToolStripMenuItem.Size = new System.Drawing.Size(46, 20);
-            this.toolToolStripMenuItem.Text = "Tools";
-            // 
-            // interactiveLabelColumn
-            // 
-            this.interactiveLabelColumn.Name = "interactiveLabelColumn";
-            this.interactiveLabelColumn.Size = new System.Drawing.Size(204, 22);
-            this.interactiveLabelColumn.Text = "Interactive Label column";
-            this.interactiveLabelColumn.Click += new System.EventHandler(this.interactiveLabelColumnToolStripMenuItem_Click);
-            // 
-            // interactiveLabelRow
-            // 
-            this.interactiveLabelRow.Name = "interactiveLabelRow";
-            this.interactiveLabelRow.Size = new System.Drawing.Size(204, 22);
-            this.interactiveLabelRow.Text = "InteractiveLabel row";
-            this.interactiveLabelRow.Click += new System.EventHandler(this.interactiveLabelRowToolStripMenuItem_Click);
-            // 
-            // rowClusterFileToolStripMenuItem
-            // 
-            this.rowClusterFileToolStripMenuItem.Name = "rowClusterFileToolStripMenuItem";
-            this.rowClusterFileToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
-            this.rowClusterFileToolStripMenuItem.Text = "Row annotation";
-            this.rowClusterFileToolStripMenuItem.Click += new System.EventHandler(this.rowAnnotationClick);
-            // 
-            // selectGenesToolStripMenuItem
-            // 
-            this.selectGenesToolStripMenuItem.Name = "selectGenesToolStripMenuItem";
-            this.selectGenesToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
-            this.selectGenesToolStripMenuItem.Text = "Select Genes";
-            this.selectGenesToolStripMenuItem.Click += new System.EventHandler(this.selectGenesToolStripMenuItem_Click);
-            // 
-            // histogramsToolStripMenuItem
-            // 
-            this.histogramsToolStripMenuItem.Name = "histogramsToolStripMenuItem";
-            this.histogramsToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
-            this.histogramsToolStripMenuItem.Text = "histograms";
-            this.histogramsToolStripMenuItem.Click += new System.EventHandler(this.histogramsToolStripMenuItem_Click);
-            // 
-            // kruskalToolStripMenuItem
-            // 
-            this.kruskalToolStripMenuItem.Name = "kruskalToolStripMenuItem";
-            this.kruskalToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
-            this.kruskalToolStripMenuItem.Text = "Kruskal";
-            this.kruskalToolStripMenuItem.Click += new System.EventHandler(this.kruskalToolStripMenuItem_Click);
-            // 
-            // minClusterDistanceToolStripMenuItem
-            // 
-            this.minClusterDistanceToolStripMenuItem.Name = "minClusterDistanceToolStripMenuItem";
-            this.minClusterDistanceToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
-            this.minClusterDistanceToolStripMenuItem.Text = "Min Cluster distance";
-            this.minClusterDistanceToolStripMenuItem.Click += new System.EventHandler(this.minClusterDistanceToolStripMenuItem_Click);
-            // 
-            // backToHistogramToolStripMenuItem
-            // 
-            this.backToHistogramToolStripMenuItem.Enabled = false;
-            this.backToHistogramToolStripMenuItem.Name = "backToHistogramToolStripMenuItem";
-            this.backToHistogramToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
-            this.backToHistogramToolStripMenuItem.Text = "Back to Dendrogram";
-            this.backToHistogramToolStripMenuItem.Click += new System.EventHandler(this.backToHistogramToolStripMenuItem_Click);
-            // 
-            // noteGenesToolStripMenuItem
-            // 
-            this.noteGenesToolStripMenuItem.Name = "noteGenesToolStripMenuItem";
-            this.noteGenesToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
-            this.noteGenesToolStripMenuItem.Text = "Note genes";
-            this.noteGenesToolStripMenuItem.Click += new System.EventHandler(this.noteGenesToolStripMenuItem_Click);
-            // 
-            // saveToolStripMenuItem
-            // 
-            this.saveToolStripMenuItem.Name = "saveToolStripMenuItem";
-            this.saveToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
-            this.saveToolStripMenuItem.Text = "Save";
-            this.saveToolStripMenuItem.Click += new System.EventHandler(this.saveToolStripMenuItem_Click);
-            // 
             // splitContainer1
             // 
             this.splitContainer1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
@@ -490,9 +402,96 @@
             this.textBox1.TabIndex = 17;
             this.textBox1.Text = "0,2";
             // 
+            // interactiveLabelColumn
+            // 
+            this.interactiveLabelColumn.Name = "interactiveLabelColumn";
+            this.interactiveLabelColumn.Size = new System.Drawing.Size(204, 22);
+            this.interactiveLabelColumn.Text = "Interactive Label column";
+            this.interactiveLabelColumn.Click += new System.EventHandler(this.interactiveLabelColumnToolStripMenuItem_Click);
+            // 
+            // interactiveLabelRow
+            // 
+            this.interactiveLabelRow.Name = "interactiveLabelRow";
+            this.interactiveLabelRow.Size = new System.Drawing.Size(204, 22);
+            this.interactiveLabelRow.Text = "InteractiveLabel row";
+            this.interactiveLabelRow.Click += new System.EventHandler(this.interactiveLabelRowToolStripMenuItem_Click);
+            // 
+            // rowClusterFileToolStripMenuItem
+            // 
+            this.rowClusterFileToolStripMenuItem.Name = "rowClusterFileToolStripMenuItem";
+            this.rowClusterFileToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.rowClusterFileToolStripMenuItem.Text = "Row annotation";
+            this.rowClusterFileToolStripMenuItem.Click += new System.EventHandler(this.rowAnnotationClick);
+            // 
+            // selectGenesToolStripMenuItem
+            // 
+            this.selectGenesToolStripMenuItem.Name = "selectGenesToolStripMenuItem";
+            this.selectGenesToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.selectGenesToolStripMenuItem.Text = "Select Genes";
+            this.selectGenesToolStripMenuItem.Click += new System.EventHandler(this.selectGenesToolStripMenuItem_Click);
+            // 
+            // histogramsToolStripMenuItem
+            // 
+            this.histogramsToolStripMenuItem.Name = "histogramsToolStripMenuItem";
+            this.histogramsToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.histogramsToolStripMenuItem.Text = "histograms";
+            this.histogramsToolStripMenuItem.Click += new System.EventHandler(this.histogramsToolStripMenuItem_Click);
+            // 
+            // kruskalToolStripMenuItem
+            // 
+            this.kruskalToolStripMenuItem.Name = "kruskalToolStripMenuItem";
+            this.kruskalToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.kruskalToolStripMenuItem.Text = "Kruskal";
+            this.kruskalToolStripMenuItem.Click += new System.EventHandler(this.kruskalToolStripMenuItem_Click);
+            // 
+            // minClusterDistanceToolStripMenuItem
+            // 
+            this.minClusterDistanceToolStripMenuItem.Name = "minClusterDistanceToolStripMenuItem";
+            this.minClusterDistanceToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.minClusterDistanceToolStripMenuItem.Text = "Min Cluster distance";
+            this.minClusterDistanceToolStripMenuItem.Click += new System.EventHandler(this.minClusterDistanceToolStripMenuItem_Click);
+            // 
+            // backToHistogramToolStripMenuItem
+            // 
+            this.backToHistogramToolStripMenuItem.Enabled = false;
+            this.backToHistogramToolStripMenuItem.Name = "backToHistogramToolStripMenuItem";
+            this.backToHistogramToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.backToHistogramToolStripMenuItem.Text = "Back to Dendrogram";
+            this.backToHistogramToolStripMenuItem.Click += new System.EventHandler(this.backToHistogramToolStripMenuItem_Click);
+            // 
+            // noteGenesToolStripMenuItem
+            // 
+            this.noteGenesToolStripMenuItem.Name = "noteGenesToolStripMenuItem";
+            this.noteGenesToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.noteGenesToolStripMenuItem.Text = "Note genes";
+            this.noteGenesToolStripMenuItem.Click += new System.EventHandler(this.noteGenesToolStripMenuItem_Click);
+            // 
+            // saveToolStripMenuItem
+            // 
+            this.saveToolStripMenuItem.Name = "saveToolStripMenuItem";
+            this.saveToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.saveToolStripMenuItem.Text = "Save";
+            this.saveToolStripMenuItem.Click += new System.EventHandler(this.saveToolStripMenuItem_Click);
+            // 
+            // toolToolStripMenuItem
+            // 
+            this.toolToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.interactiveLabelColumn,
+            this.interactiveLabelRow,
+            this.rowClusterFileToolStripMenuItem,
+            this.selectGenesToolStripMenuItem,
+            this.histogramsToolStripMenuItem,
+            this.kruskalToolStripMenuItem,
+            this.minClusterDistanceToolStripMenuItem,
+            this.backToHistogramToolStripMenuItem,
+            this.noteGenesToolStripMenuItem,
+            this.saveToolStripMenuItem});
+            this.toolToolStripMenuItem.Name = "toolToolStripMenuItem";
+            this.toolToolStripMenuItem.Size = new System.Drawing.Size(46, 20);
+            this.toolToolStripMenuItem.Text = "Tools";
+            // 
             // HeatMap
             // 
-            this.BackColor = System.Drawing.SystemColors.Window;
             this.ClientSize = new System.Drawing.Size(1391, 518);
             this.Controls.Add(this.textBox1);
             this.Controls.Add(this.checkBox1);
