@@ -15,9 +15,9 @@ namespace Graph
     {
         List<string> genes;
         public string fileName;
-        public Dictionary<string, List<int>> superGenes = new Dictionary<string, List<int>>();
+        public Dictionary<string, HashSet<string>> superGenes = new Dictionary<string, HashSet<string>>();
         Dictionary<string, int> genePos = new Dictionary<string, int>();
-        public SuperGenesForm(List <string> genes,Dictionary<string,List<int>> superGenes,bool selection=false)
+        public SuperGenesForm(List <string> genes,Dictionary<string,HashSet<string>> superGenes,bool selection=false)
         {
             InitializeComponent();
             this.genes = genes;
@@ -92,24 +92,27 @@ namespace Graph
             foreach(var item in superGenes)
             {
                 sw.WriteLine(">" + item.Key);
-                for(int i=0;i<item.Value.Count-1;i++)
+                for(int i=0;i<item.Value.Count;i++)
                 {
-                    sw.Write(item.Value[i] + " ");
+                    sw.Write(item.Value.ElementAt(i) + " ");
                 }
-                sw.WriteLine(item.Value[item.Value.Count - 1]);
+                sw.WriteLine(item.Value.ElementAt(item.Value.Count - 1));
             }
 
             sw.Close();
 
         }
-        Dictionary<string, List<int>> ReadSuperGenes(string fileName)
+        Dictionary<string, HashSet<string>> ReadSuperGenes(string fileName)
         {
             StreamReader sr = new StreamReader(fileName);
 
             Dictionary<string, int> hashGeneNames = new Dictionary<string, int>();
 
             for (int i = 0; i < genes.Count; i++)
-                hashGeneNames.Add(genes[i], i);
+                if (hashGeneNames.ContainsKey(genes[i]))
+                    Console.WriteLine(genes[i]);
+                else
+                    hashGeneNames.Add(genes[i], i);
 
             Dictionary<int, int> check = new Dictionary<int, int>();
 
@@ -123,13 +126,14 @@ namespace Graph
                 {
                     string[] aux = line.Split(' ');
                     List<string> l = aux.ToList();
-                    List<int> genesPositions = new List<int>();
+                    HashSet<string> genesP = new HashSet<string>();
                     foreach (var item in l)
                         if (hashGeneNames.ContainsKey(item))
-                            genesPositions.Add(hashGeneNames[item]);
+                            genesP.Add(item);
                        /* else
                             throw new Exception("Uknown gene: " + item);*/
-                    superGenes.Add(superGeneName, genesPositions);
+                    if(genesP.Count>0 && !superGenes.ContainsKey(superGeneName))
+                        superGenes.Add(superGeneName, genesP);
                 }
 
                 line = sr.ReadLine();
@@ -155,7 +159,7 @@ namespace Graph
             {
                 string gene = item.Key + ": ";
                 foreach (var it in item.Value)
-                    gene += genes[it] + " ";
+                    gene += it + " ";
 
                 listBox1.Items.Add(gene);
             }
@@ -221,7 +225,7 @@ namespace Graph
 
                 if (superGenes != null)
                 {
-                    Dictionary<string, List<int>> selected = new Dictionary<string, List<int>>();
+                    Dictionary<string, HashSet<string>> selected = new Dictionary<string, HashSet<string>>();
 
                     foreach (var item in superGenes)
                     {

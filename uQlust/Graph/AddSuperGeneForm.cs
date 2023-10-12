@@ -12,13 +12,13 @@ namespace Graph
 {
     public partial class AddSuperGeneForm : Form
     {
-        public List<int> superGene = new List<int>();
+        public HashSet<string> superGene = new HashSet<string>();
         BindingList<string> currentList = new BindingList<string>();
         public string name = "";
         Dictionary<string, int> genePos = new Dictionary<string, int>();
         Dictionary<string, BindingList<string>> sublists = new Dictionary<string, BindingList<string>>();
         BindingList<string> genes = new BindingList<string>();
-        public AddSuperGeneForm(List<string> genes,string name=null,List<int> superGene=null)
+        public AddSuperGeneForm(List<string> genes,string name=null,HashSet<string> superGene=null)
         {
             //this.genes = genes;
             InitializeComponent();
@@ -52,7 +52,7 @@ namespace Graph
             {
                 this.superGene = superGene;
                 foreach (var item in superGene)
-                    superGeneList.Items.Add(genes[item]);
+                    superGeneList.Items.Add(item);
             }
 
         }
@@ -88,7 +88,7 @@ namespace Graph
             }
             name = textBox1.Text;
             foreach (var item in superGeneList.Items)
-                superGene.Add(genePos[(string)item]);
+                superGene.Add((string)item);
             DialogResult = DialogResult.OK;
             this.Close();
         }

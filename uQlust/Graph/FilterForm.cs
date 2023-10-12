@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using phiClustCore;
+using phiClustCore.Distance;
 
 namespace Graph
 {
@@ -30,7 +31,7 @@ namespace Graph
 
         public static void EditFilter(FilterOmics selectedItem)
         {
-            if (selectedItem!=null && selectedItem.Parameters)
+            if (selectedItem != null && selectedItem.Parameters)
             {
                 Dictionary<string, Control> controls = new Dictionary<string, Control>();
                 Dictionary<string, string> paramsValue = new Dictionary<string, string>();
@@ -43,8 +44,7 @@ namespace Graph
                     label.Location = new Point(x, y);
                     label.Text = item.Key;
                     form.Controls.Add(label);
-
-                    if (item.Value == typeof(int) || item.Value == typeof(double))
+                    if (item.Value == typeof(int) || item.Value == typeof(double) || item.Value == typeof(string))
                     {
                         TextBox t = new TextBox();
                         controls.Add(item.Key, t);
@@ -53,19 +53,21 @@ namespace Graph
                     }
                     if (item.Value == typeof(CodingAlg))
                     {
+
                         ComboBox c = new ComboBox();
-                        c.DataSource = Enum.GetValues(typeof(CodingAlg));
+                        c.DataSource = Enum.GetValues(item.Value);
                         controls.Add(item.Key, c);
                         c.Location = new Point(x + 130, y);
                         form.Controls.Add(c);
                     }
-                    if(item.Value==typeof(bool))
+                    if (item.Value == typeof(bool))
                     {
                         CheckBox b = new CheckBox();
                         controls.Add(item.Key, b);
                         b.Location = new Point(x + 130, y);
-                        form.Controls.Add(b) ;
+                        form.Controls.Add(b);
                     }
+
                     y += 30;
                 }
                 Button bOK = new Button();
@@ -86,9 +88,9 @@ namespace Graph
                         {
                             val = ((ComboBox)item.Value).SelectedItem.ToString();
                         }
-                        if(item.Value is CheckBox)
+                        if (item.Value is CheckBox)
                         {
-                            val= ((CheckBox)item.Value).Checked.ToString();
+                            val = ((CheckBox)item.Value).Checked.ToString();
                         }
                         paramsValue.Add(item.Key, val);
                     }
@@ -114,23 +116,43 @@ namespace Graph
             selectedItem = (FilterOmics)listBox1.SelectedItem;
             if (data == null)
                 return;
-            if(!(selectedItem is LoadSuperGenes))
+            if (!(selectedItem is LoadSuperGenes) && !(selectedItem is SelectStage))
                 EditFilter(selectedItem);
             else
-            {                
-                SuperGenesForm super = new SuperGenesForm(data.geneLabels, null);
-                DialogResult res = super.ShowDialog();
-                if (res == DialogResult.OK)
+            {
+                if (selectedItem is LoadSuperGenes)
                 {
-                    LoadSuperGenes superF= (LoadSuperGenes)selectedItem;
-                    superF.file.fileName = super.fileName;
-                    superF.superGenes = super.superGenes;
+                    SuperGenesForm super = new SuperGenesForm(data.geneLabels, null);
+                    DialogResult res = super.ShowDialog();
+                    if (res == DialogResult.OK)
+                    {
+                        LoadSuperGenes superF = (LoadSuperGenes)selectedItem;
+                        FileN aux = new FileN();
+                        aux.fileName = super.fileName;
+                        superF.file.Add(aux);
+                        superF.superGenes = super.superGenes;
+                    }
                 }
+                if (selectedItem is SelectStage)
+                {
+                    OpenFileDialog fileStage = new OpenFileDialog();
+                    DialogResult res = fileStage.ShowDialog();
+                    if (res == DialogResult.OK)
+                    {
+                        StaticDic.Id.Clear();
+                        StaticDic.LoadId(fileStage.FileName);
+                        SelectStage stageFilter = (SelectStage)selectedItem;
+                        HashSet<string> stages = new HashSet<string>();
+                        foreach (var item in StaticDic.Id)
+                            stages.Add(item.Value);
 
+                        EditFilter(selectedItem);
+                    }
+                }
             }
-            DialogResult = DialogResult.OK;
-            this.Close();
-
+                DialogResult = DialogResult.OK;
+                this.Close();
+            
         }
     }
 }

@@ -260,7 +260,10 @@ namespace Graph
                 }
                 joined = OmicsDataSet.JoinOmicsData(omicsFiltered);
                 //DataForm.CheckRanking(joined, 100);
-                OmicsDataSet.CheckRanking(joined, 100, "order");
+                int s = joined.geneLabels.Count;
+                if (s > 100)
+                    s = 100;
+                OmicsDataSet.CheckRanking(joined,s, "order");
                 if (FilterOmics.remData)
                 FilterOmics.memoryFilteredData.Add(joined);
                 joined.filters = jFilters;
@@ -303,7 +306,9 @@ namespace Graph
                         DialogResult res=super.ShowDialog();
                         if(res==DialogResult.OK)
                         {
-                            cc.file.fileName = super.fileName;
+                            FileN aux = new FileN();
+                            aux.fileName = super.fileName;
+                            cc.file.Add(aux);
                             cc.superGenes = super.superGenes;
                         }
                         

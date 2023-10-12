@@ -11,7 +11,10 @@ namespace phiClustCore.Distance
         public Pearson(Dictionary<string,List<double>> data, bool flag):
                 base(data,flag)
         {
-
+            //            if(StaticDic.Id.Count==0)
+            StaticDic.Id.Clear();
+            StaticDic.LoadId(@"C:\projects\bioinfo\Cluster_patient\newData\clusters_id53");
+            //StaticDic.LoadId(@"C:\projects\bioinfo\Cluster_patient\newData\stage_id");
         }
         public override List<KeyValuePair<string, double>> GetReferenceList(List<string> structures)
         {
@@ -78,7 +81,7 @@ namespace phiClustCore.Distance
         {
             List<KeyValuePair<string, double>> refList = null;
             refList = GetReferenceList(structures);
-
+            
             return refList[0].Key;
         }
         public override int GetDistance(string refStructure, string modelStructure)
@@ -121,10 +124,17 @@ namespace phiClustCore.Distance
             if (res1 > 0 && res2 > 0)
                 vv = (Sxy - mod1.Count * avrMod1 * avrMod2) / (Math.Sqrt((Sxx - mod1.Count * avrMod1 * avrMod1) * (Syy - mod2.Count * avrMod2 * avrMod2)));
             else
-                vv = 1;
+                vv = 0;
             dist = (1.0-vv)*100;
-
-
+            /*if (StaticDic.Id.ContainsKey(refStructure) && StaticDic.Id.ContainsKey(modelStructure))
+                if (StaticDic.Id[refStructure].Equals(StaticDic.Id[modelStructure]))
+                    dist -= 10;
+                else
+                    dist += 10;*/
+            if (dist > 100)
+                dist = 100;
+            if (dist < 0)
+                dist = 0;
 
             return (int)dist;
         }

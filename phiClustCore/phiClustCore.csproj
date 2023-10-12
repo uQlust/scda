@@ -58,6 +58,7 @@
     <Compile Include="ClusterVis.cs" />
     <Compile Include="Distance\Fast3States.cs" />
     <Compile Include="Distance\FastDiscreteDist.cs" />
+    <Compile Include="Distance\StaticDic.cs" />
     <Compile Include="FastRPart.cs" />
     <Compile Include="FiltersOmics.cs" />
     <Compile Include="HeatmapDrawCore.cs" />

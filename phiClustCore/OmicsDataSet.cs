@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -203,7 +204,7 @@ namespace phiClustCore
                 foreach (var item in dicData[row])
                     res[i++] = item.Value;
                 return res;
-            }
+            }            
             res = new double[columns];
             for (int i = 0; i < data.GetLength(1); i++)
                 res[i] = data[row, i];
@@ -244,9 +245,12 @@ namespace phiClustCore
                     res.dicData[k++] = new Dictionary<int, float>(dicData[item]);
             }
             else
-                for (int i = 0, k = 0; i < index.Count; i++)
+                for (int i = 0; i < index.Count; i++)
+                {
                     for (int j = 0; j < data.GetLength(1); j++)
-                        res.data[k++, j] = data[index[i], j];
+                        res.data[i, j] = data[index[i], j];
+                   
+                }
             return res;
         }
         public SpareArray CopyColumns(int[] index)
@@ -328,24 +332,28 @@ namespace phiClustCore
                     }
             }
             else
-                throw new Exception("Not implemenetd yet");
+            {
+                for (int i = 0; i < rows; i++)
+                    for (int j = 0; j < columns; j++)
+                        if (data[i, j] != 0)
+                            freq[j]++;
+                //throw new Exception("Not implemenetd yet");
+            }
             return freq;
         }
         public SpareArray FastCopyColumnThreshold(int[] freq, int thresholdLow, int thresholdHeight)
         {
             SpareArray res = null;
             HashSet<int> validCoumns = new HashSet<int>();
-            if (spareFlag)
+            for (int i = 0; i < freq.Length; i++)
             {
-                for (int i = 0; i < freq.Length; i++)
-                {
-                    if (freq[i] >= thresholdLow && freq[i] <= thresholdHeight)
-                        validCoumns.Add(i);
-                }
-                res = new SpareArray(rows, validCoumns.Count, spareFlag);
+                if (freq[i] >= thresholdLow && freq[i] <= thresholdHeight)
+                    validCoumns.Add(i);
+            }
+            res = new SpareArray(rows, validCoumns.Count, spareFlag);
 
-                //res.valuePos = new Dictionary<float, int>(valuePos);
-                //res.values = new List<float>(values);
+            if (spareFlag)
+            {                
                 res.dicData = new Dictionary<int, float>[dicData.Length];
                 for (int i = 0; i < dicData.Length; i++)
                 {
@@ -358,18 +366,35 @@ namespace phiClustCore
 
                 }
             }
+            else
+            {
+                for(int i=0;i<rows;i++)
+                    for(int j=0;j<validCoumns.Count;j++)
+                    {
+                        res.data[i, j] = data[i, j];
+                    }
+            }
             return res;
         }
 
-        void NormalizeRows(int start, int end, SpareArray res)
+        void NormalizeRows(int start, int end, SpareArray res,HashSet<int> index)
         {
             if (spareFlag)
             {
                 for (int i = start; i < end; i++)
                 {
                     float sum = 0;
-                    foreach (var item in dicData[i])
-                        sum += item.Value;
+                    if (index == null)
+                    {
+                        foreach (var item in dicData[i])
+                            sum += item.Value;
+                    }
+                    else
+                        foreach (var item in dicData[i])
+                            if(index.Contains(item.Key))
+                                sum += item.Value;
+
+
 
                     foreach (var item in dicData[i])
                         res[i, item.Key] = item.Value / sum;
@@ -380,8 +405,14 @@ namespace phiClustCore
                 for (int i = start; i < end; i++)
                 {
                     float sum = 0;
-                    for (int j = 0; j < columns; j++)
-                        sum += this[i, j];
+                    if (index == null)
+                    {
+                        for (int j = 0; j < columns; j++)
+                            sum += this[i, j];
+                    }
+                    else
+                        foreach(var item in index)
+                            sum += this[i, item];
                     // lock (res.values) lock (res.valuePos)
 
                     for (int j = 0; j < columns; j++)
@@ -408,11 +439,8 @@ namespace phiClustCore
             {
                 for (int i = start; i < end; i++)
                 {
-                    double sum = 0;
-
                     for (int j = 0; j < columns; j++)
                         res[i, j] = (float)Math.Log(this[i, j] * 10000 + 1);
-
                 }
             }
 
@@ -437,7 +465,7 @@ namespace phiClustCore
         }
 
 
-        public SpareArray NormalizeRows()
+        public SpareArray NormalizeRows(HashSet<int> index=null)
         {
             SpareArray res = null;
             res = new SpareArray(this);
@@ -451,7 +479,7 @@ namespace phiClustCore
                 int s = (int)(i * step);
                 int e = (int)((i + 1) * step);
 
-                taskTab[i] = Task.Run(() => NormalizeRows(s, e, res));
+                taskTab[i] = Task.Run(() => NormalizeRows(s, e, res,index));
             }
             Task.WaitAll(taskTab);
             return res;
@@ -529,6 +557,8 @@ namespace phiClustCore
                     for (int j = 0; j < data.GetLength(1); j++)
                         clone.data[i, j] = data[i, j];
 
+                //clone.data = (float[,])data.Clone();                
+
             }
             if (spareFlag)
             {
@@ -543,6 +573,7 @@ namespace phiClustCore
                     {
                         clone.dicData[i].Add(item.Key, item.Value);
                     }
+                //clone.dicData =(Dictionary<int,float>[]) dicData.Clone();
             }
 
 
@@ -616,6 +647,7 @@ namespace phiClustCore
 
     public class OmicsDataSet
     {
+
         //        HashSet<string> testData = new HashSet<string>() { "CAGATCAAGGTGCACA-1_10", "CTCGGAGAGTCATCCA-1_10", "TACTTACGTCTCTTAT-1_10", "GGAGCAATCGCGTAGC-1_30", "CCAATCCCAGGGTTAG-1_0", "TGCCCATTCCTACAGA-1_2", "CATCAGAGTGAGGCTA-1_2", "GCTGCAGAGGACAGCT-1_10", "TCACAAGTCCCAACGG-1_10", "GCCAAATGTATGAATG-1_2", "CCGGTAGAGGGTVGAT-1_6", "CTACACCTCGTCTGAA-1_10", "TCCACACTCATGTGGT-1_10", "TACCTTAAGGTGCTTT-1_10" };
         public string Name { get; set; }
         public SpareArray data = null;
@@ -629,6 +661,8 @@ namespace phiClustCore
         public List<string> metaData;
 
         public BindingList<FilterOmics> filters = new BindingList<FilterOmics>();
+
+        public OmicsDataSet prev = null;
 
 
         public OmicsDataSet()
@@ -672,6 +706,17 @@ namespace phiClustCore
         {
             return Name;
         }
+        public int []GetSampleIndexes(List<string> samples)
+        {
+            HashSet<string> s = new HashSet<string>(samples);
+            int[] res = new int[samples.Count];
+            for(int i=0,n=0;i<sampleLabels.Count;i++)
+            {
+                if (s.Contains(sampleLabels[i]))
+                    res[n++] = i;
+            }
+            return res;
+        }
         public void AddCodes(Interval[] intV)
         {
             foreach (var item in intV)
@@ -695,7 +740,10 @@ namespace phiClustCore
 
             for (int i = 0; i < data.rows; i++)
             {
-                st.WriteLine(">" + sampleLabels[i]);
+                if(data.rows==sampleLabels.Count)
+                    st.WriteLine(">" + sampleLabels[i]);
+                else
+                    st.WriteLine(">" + geneLabels[i]);
                 for (int j = 0; j < data.columns; j++)
                     st.Write(" " + data[i, j]);
                 st.WriteLine();
@@ -848,7 +896,7 @@ namespace phiClustCore
             return removedData;
 
         }
-        public OmicsDataSet CreateSuperGenesData(Dictionary<string, List<int>> superGenes)
+        public OmicsDataSet CreateSuperGenesData(Dictionary<string, HashSet<string>> superGenes)
         {
             OmicsDataSet superData = new OmicsDataSet(Name + " superGenes");
 
@@ -858,15 +906,31 @@ namespace phiClustCore
             superData.geneLabels = superGenesKeys;
             superData.sampleLabels = sampleLabels;
             superData.filters = filters;
+
+            Dictionary<string, int> genePos = new Dictionary<string, int>();
+
+            for (int i = 0; i < geneLabels.Count; i++)
+                genePos.Add(geneLabels[i], i);
+
             for (int i = 0; i < data.rows; i++)
             {
                 for (int n = 0; n < superGenesKeys.Count; n++)
                 {
-                    float sum = 0;
-                    for (int j = 0; j < superGenes[superGenesKeys[n]].Count; j++)
-                        sum += data[i, superGenes[superGenesKeys[n]][j]];
+                    List<int> position = new List<int>();
+                    foreach (var item in superGenes[superGenesKeys[n]])
+                        if (genePos.ContainsKey(item))
+                            position.Add(genePos[item]);
 
-                    superData.data[i, n] = sum / superGenes[superGenesKeys[n]].Count;
+                    if (position.Count > 0)
+                    {
+                        float sum = 0;
+                        for (int j = 0; j < position.Count; j++)
+                            sum += data[i, position[j]];
+
+                        superData.data[i, n] = sum / position.Count;
+                    }
+                    else
+                        superData.data[i, n] = 0;
                 }
             }
 
@@ -940,7 +1004,7 @@ namespace phiClustCore
                 current = item.ApplyFilter(current);
                 if (item.Name.Contains("Super"))
                 {
-                    CheckRanking(current, 50, "superOrder");
+                    CheckRanking(current, current.geneLabels.Count, "superOrder");
                 }
             }
 
@@ -1004,10 +1068,6 @@ namespace phiClustCore
             return dataSet;
 
         }
-
-
-
-
 
     }
 }

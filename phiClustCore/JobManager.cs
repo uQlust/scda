@@ -408,7 +408,7 @@ namespace phiClustCore
             return output;
         }
 
-        ClusterOutput MakeClusters(Dictionary<string,List<double>> data,string name,int num)
+        Tuple<ClusterOutput,DistanceMeasure> MakeClusters(Dictionary<string,List<double>> data,string name,int num)
         {
             ClusterOutput output = null;
             if (num <= data.Count)
@@ -416,7 +416,7 @@ namespace phiClustCore
                 switch (opt.hierarchical.microCluster)
                 {
                     case ClusterAlgorithm.HashCluster:
-                        HashCluster hashUpper = null;
+                        HashCluster hashUpper = null;                        
                         hashUpper = new HashCluster(data, opt);
                         hashUpper.InitHashCluster();
                         hashUpper.StartProgress = 0;
@@ -464,9 +464,7 @@ namespace phiClustCore
                         kMeans km = new kMeans(dist);
                         List<string> lData = new List<string>(data.Keys);
                         output = km.kMeansLevel(opt.hash.relClusters, 500, lData);
-                        break;
-
-
+                        return new Tuple<ClusterOutput, DistanceMeasure>(output, dist);                        
                 }
 
 
@@ -474,7 +472,7 @@ namespace phiClustCore
             else
                 output = MakeDummyClusters(data);
 
-            return output;
+            return new Tuple<ClusterOutput, DistanceMeasure>(output,null);
 
 
         }
@@ -515,9 +513,11 @@ namespace phiClustCore
             
             
             ClusterOutput aux,output;
-
-            var joined = dataS;//.ApplyFilters(dataS.filters);
-           // joined = joined.SelectTotestData();
+            var joined = dataS;
+            if (dataS.prev!=null)
+                joined = dataS.prev;//.ApplyFilters(dataS.filters);
+ //           joined.Save("Disc");
+            // joined = joined.SelectTotestData();
             var data = MakeDictionary(joined);
             //  opt.hierarchical.distance = DistanceMeasures.PEARSON;
             int numLeftClusters, numUpperClusters;
@@ -525,6 +525,9 @@ namespace phiClustCore
             numUpperClusters = opt.hash.reqClusters;
             numLeftClusters = opt.hash.relClusters;
             OmicsDataSet dataTrans = joined.Transpose();
+
+            //dataTrans.Save("Disc_rot");
+
             var dataT = MakeDictionary(dataTrans);
 
 
@@ -536,7 +539,7 @@ namespace phiClustCore
             ClusterOutput outputUpper;
             DateTime cpuPart2 = DateTime.Now;
             opt.hash.relClusters = numUpperClusters;
-                outputUpper=MakeClusters(dataT, name, numUpperClusters);
+            outputUpper =MakeClusters(dataT, name, numUpperClusters).Item1;
             
             progressDic.Remove(name);
 
@@ -544,10 +547,16 @@ namespace phiClustCore
             opt.omics.heatmap = true;
 //            profOm.Save(OmicsInput.fileName);
             opt.hash.relClusters = numLeftClusters;
-            if (opt.hierarchical.dummyProfileName.Length == 0)
-                outputLeft = MakeClusters(data, name, numLeftClusters);
-            else
-                outputLeft = LoadClusters(opt.hierarchical.dummyProfileName);
+            Tuple<ClusterOutput, DistanceMeasure> cc = null;
+                cc = MakeClusters(data, name, numLeftClusters);
+                outputLeft = cc.Item1;
+                if (opt.hierarchical.dummyProfileName.Length > 0)
+                {
+                    var xx=StaticDic.GetClusters(data);
+                    if (xx != null)
+                        outputLeft.clusters.list = xx;
+                }
+                //left.MakeDummyDendrog
 
             Settings set = new Settings();
             set.Load();
@@ -569,6 +578,8 @@ namespace phiClustCore
 
             output.clusters = outputUpper.clusters;
             output.clusters2 = outputLeft.clusters;
+            if(cc!=null)
+                output.distM = cc.Item2;
            output.aux1 = listLeft;
            output.aux2 = listUpper;
            output.nodes = new List<HClusterNode>();
@@ -576,7 +587,10 @@ namespace phiClustCore
            upper.StartProgress = 0.5;
            upper.EndProgress = 0.75;
            progressDic.Add(name, upper);
-          output.data = joined;
+            if(dataS.prev!=null)
+                output.data = dataS;
+            else
+                output.data=joined ;
           aux=upper.DendrogUsingMicroClusters(dataT,refStructUpper.Item2, refStructUpper.Item1);
 
            List<HClusterNode> upperLeafs = aux.hNode.GetLeaves();
@@ -596,8 +610,8 @@ namespace phiClustCore
            left.EndProgress = 1.0;
            progressDic.Add(name, left);
 
-            aux = left.DendrogUsingMicroClusters(data, refStructLeft.Item2, refStructLeft.Item1);
-
+           aux = left.DendrogUsingMicroClusters(data, refStructLeft.Item2, refStructLeft.Item1);
+            
             /*Dictionary<string, int> toCheckUpper = new Dictionary<string, int>();
             foreach (var item in hashLeft.selectedColumnsHash)
             {

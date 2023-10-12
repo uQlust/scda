@@ -1,4 +1,5 @@
-﻿using System;
+﻿using phiClustCore.Distance;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -54,14 +55,13 @@ namespace phiClustCore
         }
         public override string ToString()
         {
-            return "Qunatile column normalization";
+            return "Quantile column normalization";
         }
         void QuantileThread(int[,] rankData, int[,] rank, SpareArray data, float[] avr, int start, int end)
         {
             Dictionary<double, int> valToRank = new Dictionary<double, int>(500);
             for (int i = start; i < end; i++)
-            {                
-
+            {
                 valToRank.Clear();
                 var colTuple = data.GetColumnValues(i);
                 float[] columnValues = colTuple.Item1;
@@ -203,7 +203,7 @@ namespace phiClustCore
         }
         public override string ToString()
         {
-            return "Qunatile row normalization";
+            return "Quantile row normalization";
         }
 
         public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
@@ -277,7 +277,8 @@ namespace phiClustCore
             res.geneLabels = dataS.geneLabels;
             res.sampleLabels = dataS.sampleLabels;
 
-            //memoryFilteredData.Add(res);
+            if (remData)
+                memoryFilteredData.Add(res);
 
             return res;
         }
@@ -335,6 +336,9 @@ namespace phiClustCore
                     res.data[i, j] = dataS.data[i, index[j]];
 
             res.sampleLabels = dataS.sampleLabels;
+
+            if (remData)
+                memoryFilteredData.Add(res);
 
             //memoryFilteredData.Add(res);
 
@@ -503,6 +507,8 @@ namespace phiClustCore
 
             if (remData)
                 memoryFilteredData.Add(res);
+
+            //res.Save("topGenes");
 
             return res;
         }
@@ -835,9 +841,14 @@ namespace phiClustCore
     }
     public class LoadSuperGenes : FilterOmics
     {
-        public FileN file = new FileN();
-        public override string Name { get { return ToString() + ":" + file.fileName; } }
-        public Dictionary<string, List<int>> superGenes = new Dictionary<string, List<int>>();
+        public List<FileN> file = new List<FileN>();
+        public override string Name {
+            get
+            {
+                return ToString() + ":" + GetAllFiles();
+            }
+        }
+        public Dictionary<string, HashSet<string>> superGenes = new Dictionary<string, HashSet<string>>();
 
         public LoadSuperGenes()
         {
@@ -846,18 +857,35 @@ namespace phiClustCore
         public override Dictionary<string, Type> GetParameters()
         {
             Dictionary<string, Type> res = new Dictionary<string, Type>();
-            res.Add("File name", typeof(string));
+            for (int i = 0; i < file.Count; i++)
+                res.Add("File name_" + i, typeof(string));
             return res;
+        }
+        string GetAllFiles()
+        {
+            string n = "";
+            if (file.Count > 0)
+                foreach (var item in file)
+                    n += item.fileName + " ";
+
+            return n;
+
         }
         public override void SetParameters(Dictionary<string, string> x)
         {
-            file.fileName = x["File name"];
-            name = ToString() + " " + file.fileName;
+            foreach (var item in x.Keys)
+            {
+                FileN aux = new FileN();
+                aux.fileName = x[item];
+                file.Add(aux);
+            }
+            name = ToString() + " " + GetAllFiles();
         }
         public override Dictionary<string, string> GetParametersValue()
         {
             Dictionary<string, string> v = new Dictionary<string, string>();
-            v.Add("File name", file.fileName);
+            for (int i = 0; i < file.Count; i++)
+                v.Add("File name_" + i, file[i].fileName);
 
             return v;
         }
@@ -865,40 +893,33 @@ namespace phiClustCore
         {
             return "Super gene file";
         }
-        Dictionary<string, List<int>> ReadSuperGenes(string fileName, List<string> genes)
+        Dictionary<string, HashSet<string>> ReadSuperGenes()
         {
-            StreamReader sr = new StreamReader(fileName);
-
-            Dictionary<string, int> hashGeneNames = new Dictionary<string, int>();
-
-            for (int i = 0; i < genes.Count; i++)
-                hashGeneNames.Add(genes[i], i);
-
-            Dictionary<int, int> check = new Dictionary<int, int>();
-
-            string superGeneName = "";
-            string line = sr.ReadLine();
-            while (line != null)
+            foreach (var itemFile in file)
             {
-                if (line.StartsWith(">"))
-                    superGeneName = line.Substring(1);
-                else
+                StreamReader sr = new StreamReader(itemFile.fileName);
+                string superGeneName = "";
+                string line = sr.ReadLine();
+                while (line != null)
                 {
-                    string[] aux = line.Split(' ');
-                    List<string> l = aux.ToList();
-                    List<int> genesPositions = new List<int>();
-                    foreach (var item in l)
-                        if (hashGeneNames.ContainsKey(item))
-                            genesPositions.Add(hashGeneNames[item]);
-                    /* else
-                         throw new Exception("Uknown gene: " + item);*/
-                    superGenes.Add(superGeneName, genesPositions);
+                    if (line.StartsWith(">"))
+                        superGeneName = line.Substring(1);
+                    else
+                    {
+                        string[] aux = line.Split(' ');
+                        List<string> l = aux.ToList();
+                        HashSet<string> genesHash = new HashSet<string>();
+                        foreach (var item in l)
+                            genesHash.Add(item);
+                        /* else
+                             throw new Exception("Uknown gene: " + item);*/
+                        superGenes.Add(superGeneName, genesHash);
+                    }
+
+                    line = sr.ReadLine();
                 }
-
-                line = sr.ReadLine();
+                sr.Close();
             }
-            sr.Close();
-
             return superGenes;
         }
 
@@ -913,6 +934,12 @@ namespace phiClustCore
                 st.WriteLine();
             }
             st.Close();*/
+
+            if (superGenes == null || superGenes.Count==0)
+            {
+                superGenes = ReadSuperGenes();
+            }
+
             var res = dataS.CreateSuperGenesData(superGenes);
 
             Interval[] intv = new Interval[2];
@@ -926,6 +953,65 @@ namespace phiClustCore
                 memoryFilteredData.Add(res);
 
             //res.Save("SuperGenes");
+
+            return res;
+        }
+
+    }
+    public class SelectStage : FilterOmics
+    {
+        public string stageType = "";
+        public SelectStage()
+        {
+            name = ToString();
+            parameters = true;
+        }
+        public override string ToString()
+        {
+            return "Select samples based on stage";
+        }
+        public override Dictionary<string, Type> GetParameters()
+        {
+            Dictionary<string, Type> res = new Dictionary<string, Type>();
+            res.Add("Set stage name", typeof(string));
+            return res;
+        }
+        public override void SetParameters(Dictionary<string, string> x)
+        {
+            stageType = x["Set stage name"];
+        }
+
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            OmicsDataSet res = new OmicsDataSet("Stage");
+            SpareArray data = dataS.data;
+            int count = 0;
+            if (StaticDic.Id.Count == 0)
+                throw new Exception("Stages not defined");
+            for (int i = 0; i < dataS.sampleLabels.Count; i++)
+                if (StaticDic.Id.ContainsKey(dataS.sampleLabels[i]))
+                    if(StaticDic.Id[dataS.sampleLabels[i]].Equals(stageType))
+                        count++;
+            int[] index = new int[count];
+            res.sampleLabels = new List<string>(count);
+            count = 0;
+            for (int i = 0; i < dataS.sampleLabels.Count; i++)
+                if (StaticDic.Id.ContainsKey(dataS.sampleLabels[i]))
+                    if (StaticDic.Id[dataS.sampleLabels[i]].Equals(stageType))
+                    {
+                        index[count] = i;
+                        res.sampleLabels.Add(dataS.sampleLabels[i]);
+                    }
+            res.data = new SpareArray(index.Length, data.columns, false);
+            for (int j = 0; j < index.Length; j++)
+            {
+                for (int i = 0; i < data.columns; i++)
+                    res.data[j, i] = dataS.data[j, i];
+            }
+
+            res.geneLabels = dataS.geneLabels;
+            if (remData)
+                memoryFilteredData.Add(res);
 
             return res;
         }
@@ -949,30 +1035,28 @@ namespace phiClustCore
             OmicsDataSet res = new OmicsDataSet("ShiftNonNegative");
             SpareArray data = dataS.data;
             res.data = new SpareArray(data.rows, data.columns, false);
+
             double minValue = double.MaxValue;
             for (int j = 0; j < data.rows; j++)
-            {
-
+            {             
                 for (int i = 0; i < data.columns; i++)
                     if (data[j, i] <= minValue)
                         minValue = data[j, i];
             }
-
-
-            if (minValue < 0)
+            for (int j = 0; j < data.rows; j++)
             {
-                for (int j = 0; j < data.rows; j++)
+
+                if (minValue < 0)
                 {
                     for (int i = 0; i < data.columns; i++)
                         res.data[j, i] = (float)(data[j, i] + Math.Abs(minValue));
                 }
-
+                else
+                    for (int i = 0; i < data.columns; i++)
+                        res.data[j, i] = data[j, i];
 
             }
-            else
-                res.data = data;
-
-
+            
             res.geneLabels = dataS.geneLabels;
             res.sampleLabels = dataS.sampleLabels;
             if (remData)
@@ -1035,7 +1119,7 @@ namespace phiClustCore
 
         public override string ToString()
         {
-            return "Descritize ";
+            return "Descritize";
         }
         Tuple<double, double> BinomialFit(double[] dat)
         {
@@ -1078,14 +1162,17 @@ namespace phiClustCore
             double max = int.MinValue;
             for (int i = 0; i < dat.Length; i++)
             {
+                if (double.IsNaN(dat[i]))
+                    Console.WriteLine();
                 v[i] = (int)(dat[i] * range);
-
+                
             }
 
             //frequency = new int[max+1];
 
             for (int i = 0; i < dat.Length; i++)
             {
+                if(v[i]>=0 && v[i]<frequency.Length)
                 frequency[v[i]]++;
             }
             int[] newFreq = new int[50];
@@ -1188,8 +1275,6 @@ namespace phiClustCore
                 for (int n = 0; n < data.rows; n++)
                 {
                     col[n] = data[n, i];
-                    if (col[n] < 0)
-                        Console.WriteLine("UUU");
                     if (maxV < col[n])
                         maxV = col[n];
                 }
@@ -1201,6 +1286,14 @@ namespace phiClustCore
                 double avr;
                 double stdev;
 
+                if(maxV==double.MinValue)
+                {
+                    for (int n = 0; n < col.Length; n++)                    
+                                newData[n, i] = -1;
+                                
+                    continue;                            
+
+                }
                 //var h=BinomialFit(col);
                 //Zróbmy normalizację col
                 if (maxV != 0)
@@ -1258,18 +1351,18 @@ namespace phiClustCore
                 if (codingColumn)
                 {
 
-                for (int i = 0; i < data.columns; i++)
-                {
-                    hashValues.Clear();
-                    for (int j = 0; j < data.rows; j++)
+                    for (int i = 0; i < data.columns; i++)
                     {
+                        hashValues.Clear();
+                        for (int j = 0; j < data.rows; j++)
+                        {
 
-                        if (!hashValues.Keys.Contains(data[j, i]))
-                            hashValues.Add(data[j, i], 1);
-                        else
-                            hashValues[data[j, i]]++;
-                    }
-                    intv = SetupIntervals(hashValues, NumStates, Coding);
+                            if (!hashValues.Keys.Contains(data[j, i]))
+                                hashValues.Add(data[j, i], 1);
+                            else
+                                hashValues[data[j, i]]++;
+                        }
+                        intv = SetupIntervals(hashValues, NumStates, Coding);
                         var codedColumn = IntervalCodigPerGene(data, i, intv);
                         for (int k = 0; k < codedColumn.Length; k++)
                             outData[k, i] = codedColumn[k];
@@ -1301,16 +1394,86 @@ namespace phiClustCore
                 }
 
             }
-            res.data = outData;
-            res.geneLabels = dataS.geneLabels;
-            res.sampleLabels = dataS.sampleLabels;
+            Dictionary<double, int> freq = new Dictionary<double, int>();
+            HashSet<int> toRemoveRows = new HashSet<int>();
+            for (int i = 0; i < outData.rows; i++)
+            {
+                freq.Clear();
+                for (int j = 0; j < outData.columns; j++)
+                    if (freq.ContainsKey(outData[i, j]))
+                        freq[outData[i, j]]++;
+                    else
+                        freq.Add(outData[i, j], 1);
 
+                var maxValueKey = freq.Aggregate((x, y) => x.Value > y.Value ? x : y).Key;
+                double xx = ((double)freq[maxValueKey]) / outData.columns;
+                if (xx > 0.9)
+                    toRemoveRows.Add(i);
+            }
+            Dictionary<string, double> dicTMP = new Dictionary<string, double>();
+            HashSet<int> toRemoveColumns= new HashSet<int>();
+            for (int i = 0; i < outData.columns; i++)
+            {
+                freq.Clear();
+                for (int j = 0; j < outData.rows; j++)
+                    if (freq.ContainsKey(outData[j,i]))
+                        freq[outData[j,i]]++;
+                    else
+                        freq.Add(outData[j,i], 1);
+
+                var maxValueKey = freq.Aggregate((x, y) => x.Value > y.Value ? x : y).Key;
+                double xx = ((double)freq[maxValueKey]) / outData.rows;
+                //dicTMP.Add(dataS.geneLabels[i], xx);
+                if ((xx > 0.5 && maxValueKey==-1) || xx>0.9)
+                {
+                    toRemoveColumns.Add(i);
+                }
+            }
+
+
+            if (toRemoveRows.Count > 0 || toRemoveColumns.Count>0)
+            {
+                SpareArray filteredData = new SpareArray(data.rows - toRemoveRows.Count, data.columns-toRemoveColumns.Count, false);
+                res.sampleLabels = new List<string>();
+                int k = 0;
+                for (int i = 0; i < outData.rows; i++)
+                {
+                    if (!toRemoveRows.Contains(i))
+                    {
+                        int s = 0;
+                        for (int j = 0; j < outData.columns; j++)
+                            if(!toRemoveColumns.Contains(j))
+                                filteredData[k, s++] = outData[i, j];
+
+                        res.sampleLabels.Add(dataS.sampleLabels[i]);
+                        k++;
+                    }
+                }
+                res.data = filteredData;
+                
+                if(toRemoveColumns.Count>0)
+                {
+                    res.geneLabels = new List<string>();
+                    for (int s = 0; s < dataS.geneLabels.Count; s++)
+                        if(!toRemoveColumns.Contains(s))
+                            res.geneLabels.Add(dataS.geneLabels[s]);
+                }
+                else
+                    res.geneLabels = dataS.geneLabels;
+            }
+            else
+            {
+                res.data = outData;
+                res.geneLabels = dataS.geneLabels;
+                res.sampleLabels = dataS.sampleLabels;
+            }
             res.intervals = intervals;
             res.AddCodes(intervals[0]);
 
             if (remData)
                 memoryFilteredData.Add(res);
             //res.Save("Discr");
+            //res.prev = dataS;
             return res;
         }
         public static void AssignCodeToIntervals(double avr, Interval[] intervals)
@@ -1379,7 +1542,7 @@ namespace phiClustCore
                         {
                             int c = s + 1;
                             if (c < dlist.Count)
-                                intervals[0].max = dlist[s] + 0.01 * (dlist[c] - dlist[s]);
+                                intervals[0].max = (dlist[s] + dlist[c])/2;
                             else
                                 intervals[0].max = dlist[s];
                             intervals[0].min = double.MinValue;
@@ -1393,8 +1556,11 @@ namespace phiClustCore
                         if (counter > amount)
                         {
                             intervals[1].min = intervals[0].max;
-                            intervals[1].max = dlist[s] + 0.01 * dlist[s];
-
+                            int c = s-1;
+                            if (c >=0)
+                                intervals[1].max = (dlist[s] +dlist[c])/2;
+                            else
+                                intervals[1].max = dlist[s];
                             intervals[2].min = intervals[1].max;
                             intervals[2].max = double.MaxValue;
                             break;
@@ -1474,19 +1640,6 @@ namespace phiClustCore
 
             columns = new double[data.columns];
 
-            int rem = 0;
-            for (int i = 0; i < dataS.geneLabels.Count; i++)
-                if (dataS.geneLabels[i].Contains("ACAP3"))
-                {
-                    rem = i;
-                    break;
-                }
-
-            float[] acap = new float[dataS.data.rows];
-            for (int i = 0; i < acap.Length; i++)
-                acap[i] = dataS.data[i, rem];
-
-
             for (int i = 0; i < data.rows; i++)
                 for (int j = 0; j < data.columns; j++)
                     sumAll += data[i, j];
@@ -1562,53 +1715,12 @@ namespace phiClustCore
                 //b.Variance
             }
 
-
-
-            /*            for (int i = 0; i < data.GetLength(1); i++)
-                        {
-                            sumX = 0;
-                            sumX2 = 0;
-                            int counter = 0;
-                            for (int j = 0; j < data.GetLength(0); j++)
-                                if (data[j, i] != double.NaN)
-                                {
-                                    sumX += data[j, i];
-                                    sumX2 += data[j, i] * data[j, i];
-                                    counter++;
-                                }
-
-                            if (counter > 0)
-                            {
-                                sumX /= counter;
-                                sumX2 /= counter;
-                                avr[i] = sumX;
-                                dev[i] = Math.Sqrt(sumX2 - avr[i] * avr[i]);
-                            }
-                        }*/
-
-
             for (int i = 0; i < data.columns; i++)
             {
-
                 for (int j = 0; j < data.rows; j++)
-                    if (data[j, i] != double.NaN && data[j, i] != 0 && dev[i] > 0)
+                    if (data[j, i] != double.NaN && dev[i] > 0)
                         data[j, i] = (float)((data[j, i] - avr[i]) / dev[i]);
             }
-
-            /*double []dev2 = new double[data.GetLength(1)];
-            for (int i = 0; i < data.GetLength(1); i++)
-            {
-                for (int j = 0; j < data.GetLength(0); j++)
-                    xx[j] = data[j, i];
-
-                NormalDistribution b = new NormalDistribution();
-                b.Fit(xx);
-                //b.Fit(xx, weight);
-                
-                dev2[i] = b.StandardDeviation;
-                avr[i] = b.Mean;
-                //b.Variance
-            }*/
 
             res.data = data;
             res.geneLabels = dataS.geneLabels;
@@ -1643,11 +1755,13 @@ namespace phiClustCore
             SpareArray data = (SpareArray)dataS.data.Clone();
             dev = new float[data.rows];
             avr = new float[data.rows];
-
+            Dictionary<double, int> freqV = new Dictionary<double, int>();
+            int counterP = 0;
             for (int i = 0; i < data.rows; i++)
             {
                 sumX = 0;
                 sumX2 = 0;
+                freqV.Clear();
                 int counter = 0;
                 for (int j = 0; j < data.columns; j++)
                     if (data[i, j] != double.NaN)
@@ -1655,7 +1769,21 @@ namespace phiClustCore
                         sumX += data[i, j];
                         sumX2 += data[i, j] * data[i, j];
                         counter++;
+
+                        if (!freqV.ContainsKey(data[i, j]))
+                            freqV.Add(data[i, j], 0);
+
+                        freqV[data[i, j]]++;
                     }
+
+                int xx = int.MinValue;
+                foreach(var item in freqV)
+                {
+                    if (item.Value > xx)
+                        xx = item.Value;
+                }
+                if (xx > data.columns / 2)
+                    counterP++;
 
                 if (counter > 0)
                 {
@@ -1671,7 +1799,7 @@ namespace phiClustCore
             {
 
                 for (int j = 0; j < data.columns; j++)
-                    if (data[i, j] != double.NaN && data[i, j] != 0 && dev[i] > 0)
+                    if (data[i, j] != double.NaN  && dev[i] > 0)
                         data[i, j] = (data[i, j] - avr[i]) / dev[i];
             }
             res.data = data;
@@ -1679,6 +1807,8 @@ namespace phiClustCore
             res.sampleLabels = dataS.sampleLabels;
             if (remData)
                 memoryFilteredData.Add(res);
+
+// res.Save("NormalizationZScore");
 
             return res;
         }
@@ -1741,4 +1871,60 @@ namespace phiClustCore
         }
 
     }
-}
+    public class RowNormalizationGeneSelected : FilterOmics
+    {
+        string geneName = "";
+        public RowNormalizationGeneSelected()
+        {
+            name = ToString();
+            parameters = true;
+        }
+        public override Dictionary<string, Type> GetParameters()
+        {
+            Dictionary<string, Type> res = new Dictionary<string, Type>();
+
+            res.Add("Gene name", typeof(string));
+
+            return res;
+        }
+        public override void SetParameters(Dictionary<string, string> x)
+        {
+            geneName = x["Gene name"];
+            name = "Gene name " + geneName;
+        }
+        public override Dictionary<string, string> GetParametersValue()
+        {
+            Dictionary<string, string> v = new Dictionary<string, string>();
+            v.Add("Gene name", geneName);
+            return v;
+        }
+
+
+        public override string ToString()
+        {
+            return "Row normalization based on selected genes- normalized counts";
+        }
+        public override OmicsDataSet ApplyFilter(OmicsDataSet dataS)
+        {
+            OmicsDataSet res = new OmicsDataSet(dataS.Name + "_" + ToString());
+
+
+            HashSet<int> index = new HashSet<int>();
+            for (int i = 0; i < dataS.geneLabels.Count; i++)
+                if (dataS.geneLabels[i].StartsWith(geneName))
+                    index.Add(i);
+
+
+            res.data = dataS.data.NormalizeRows(index);
+            res.geneLabels = dataS.geneLabels;
+            res.sampleLabels = dataS.sampleLabels;
+            if (remData)
+                memoryFilteredData.Add(res);
+
+
+            //res.Save("Normalization");
+
+            return res;
+        }
+    }
+ }
