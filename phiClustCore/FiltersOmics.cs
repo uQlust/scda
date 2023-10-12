@@ -1061,7 +1061,7 @@ namespace phiClustCore
             res.sampleLabels = dataS.sampleLabels;
             if (remData)
                 memoryFilteredData.Add(res);
-
+            res.Save("shifted");
             return res;
         }
 

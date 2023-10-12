@@ -743,6 +743,26 @@ namespace phiClustCore
             draw.upper.PrepareGraphNodes(draw.upperBitMap, horizontalCuttDistance);
 
         }
+        public void ResizeHeatMap(Size bUpper,Size bLeft,Size b)
+        {
+            draw.upperBitMap = new Bitmap(bUpper.Width, bUpper.Height);
+            draw.leftBitMap = new Bitmap(bLeft.Width, bLeft.Height);
+            draw.heatMap = new Bitmap(bUpper.Width, bLeft.Height);
+            draw.left.PrepareGraphNodes(draw.leftBitMap, verticalCuttDistance);
+            draw.upper.PrepareGraphNodes(draw.upperBitMap, horizontalCuttDistance);
+            PaintLeftDescription(b.Width);
+        }
+        public void ClearDistance()
+        {
+            horizontalCuttDistance = double.MaxValue;
+            verticalCuttDistance = double.MaxValue;
+            draw.auxUpper.ClearColors(Color.Black);
+            draw.auxLeft.ClearColors(Color.Black);
+            draw.upper.MakeAllVisible();
+            draw.left.MakeAllVisible();
+            draw.upper.PrepareGraphNodes(draw.upperBitMap, horizontalCuttDistance);
+            draw.left.PrepareGraphNodes(draw.leftBitMap, verticalCuttDistance);
+        }
         public void Swap()
         {
             upperLeaves = draw.upperNode.GetLeaves();

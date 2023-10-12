@@ -197,7 +197,7 @@ namespace Graph
         }
         private void HeatMap_ResizeEnd(object sender, EventArgs e)
         {
-
+            hCore.ResizeHeatMap(pictureBoxUpper.Size, pictureBoxLeft.Size, pictureBox6.Size)
             if (!fullImage)
             {
                 hCore.draw.upperBitMap = new Bitmap(pictureBoxUpper.Width, pictureBoxUpper.Height);
@@ -969,14 +969,7 @@ namespace Graph
         {
             cutHorizontalLine = false;
             cutVerticalLine = false;
-            hCore.horizontalCuttDistance = double.MaxValue;
-            hCore.verticalCuttDistance = double.MaxValue;
-            hCore.draw.auxUpper.ClearColors(Color.Black);
-            hCore.draw.auxLeft.ClearColors(Color.Black);
-            hCore.draw.upper.MakeAllVisible();
-            hCore.draw.left.MakeAllVisible();
-            hCore.draw.upper.PrepareGraphNodes(hCore.draw.upperBitMap, hCore.horizontalCuttDistance);
-            hCore.draw.left.PrepareGraphNodes(hCore.draw.leftBitMap, hCore.verticalCuttDistance);
+            hCore.ClearDistance();
             pictureBoxLeft.Refresh();
             pictureBoxUpper.Refresh();
             pictureBoxHeatMap.Refresh();
@@ -988,9 +981,7 @@ namespace Graph
         }
 
         private void toolStripButton5_Click(object sender, EventArgs e)
-        {
-           
-            //draw.upper.MakeAllVisible();
+        {           
             hCore.upperLeaves = hCore.draw.auxUpper.GetLeaves();
             double threshold = Convert.ToDouble(textBox1.Text);
             foreach (var up in hCore.upperLeaves)                

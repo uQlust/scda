@@ -51,8 +51,6 @@ namespace singleCellAnalisysTerminal
         public void Run()
         {
 
-            int resWidth = 0;
-            int resHeight = 0;
             Options opt = new Options();
             ClusterVis clusterOut = new ClusterVis();
 
