@@ -775,8 +775,6 @@ namespace phiClustCore
             upperLeaves = draw.auxUpper.GetLeaves();
             for (int i = 0; i < upperLeaves.Count; i++)
             {
-                if (upperLeaves[i].refStructure.Contains("G2M"))
-                    Console.WriteLine("Ups");
                 if (upperLeaves[i].parent.realDist > 0.5)
                     upperLeaves[i].visible = false;
                 if (upperLeaves[i].parent.parent != null)
